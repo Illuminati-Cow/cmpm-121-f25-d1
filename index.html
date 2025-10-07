@@ -14,9 +14,19 @@
       <div id="income-box">
         <h1>Stats</h1>
         <h2>Capital</h2>
-        <p id="currency-display"></p>
-        <p>Per Click: $1.00</p>
-        <p>Per Second: $0.00</p>
+        <div>
+          <p>Funds</p>
+          <p id="currency-display"></p>
+        </div>
+        <h2>Income</h2>
+        <div>
+          <p>Click Power</p>
+          <p id="click-power-display">$1.00</p>
+        </div>
+        <div>
+          <p>Passive</p>
+          <p id="income-display">$0.00/s</p>
+        </div>
       </div>
       <div id="clicker-box">
         <button id="main-clicker">⛏️</button>
@@ -60,6 +70,12 @@
     margin: 0 0 0 1ch;
     font-size: 1.125em;
     color: #333;
+  }
+
+  #income-box > div {
+    display: flex;
+    justify-content: start;
+    margin-bottom: 0.5em;
   }
 
   #game-canvas {
