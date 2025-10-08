@@ -51,7 +51,7 @@ const miningTabButton = document.getElementById(
 //#endregion
 
 //#region Load Data
-const upgradeData: Upgrade[] = await fetch("/data/upgrades.json")
+const upgradeData: Upgrade[] = await fetch("data/upgrades.json")
   .then((res) => res.json())
   .then((data) => data as Upgrade[]);
 //#endregion
