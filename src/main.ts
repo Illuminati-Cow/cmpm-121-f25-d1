@@ -44,6 +44,9 @@ const mainClicker = document.getElementById(
 const currencyDisplay = document.getElementById(
   "currency-display",
 ) as HTMLParagraphElement;
+const clickIncomeDisplay = document.getElementById(
+  "click-income-display",
+) as HTMLSpanElement;
 const clickPowerDisplay = document.getElementById(
   "click-power-display",
 ) as HTMLParagraphElement;
@@ -154,16 +157,23 @@ function calculateCost(level: number, baseCost: number): number {
   return 1.5 ** level * baseCost;
 }
 
+function calculateClickValue(): number {
+  return clickPower;
+}
+
 function getUpgradeLevel(upgradeId: number): number {
   const upgrade = gameState.upgrades.find((u) => u.id === upgradeId);
   return upgrade ? upgrade.level : 0;
 }
 
 let lastTick = performance.now();
+let clicksThisSecond = 0;
+
 function logicUpdate() {
   const delta = (performance.now() - lastTick) / 1000;
   lastTick = performance.now();
   consumeClicks(pendingClicks);
+  clicksThisSecond += pendingClicks;
   pendingClicks = 0;
   tickUpgrades(delta);
 }
@@ -171,12 +181,12 @@ function logicUpdate() {
 function enterRenderLoop() {
   renderDelta = performance.now() - lastRenderUpdate;
   lastRenderUpdate = performance.now();
-  updateDisplay();
+  updateStatsDisplay();
   requestAnimationFrame(enterRenderLoop);
 }
 
 function consumeClicks(clicks: number) {
-  gameState.currency += clicks * clickPower;
+  gameState.currency += clicks * calculateClickValue();
 }
 
 function tickUpgrades(_delta: number) {
@@ -189,7 +199,7 @@ function tickUpgrades(_delta: number) {
 
 let displayedCurrency = 0;
 const currencyAnimationSpeed = 10;
-function updateDisplay() {
+function updateStatsDisplay() {
   // Animate the displayed currency towards the actual currency
   const diff = gameState.currency - displayedCurrency;
   if (renderDelta > 1000) {
@@ -208,6 +218,37 @@ function updateDisplay() {
     style: "currency",
     currency: "USD",
   }).format(displayedCurrency);
+}
+
+function updateUpgradeDisplay() {
+  const upgradeElements = upgradeList.querySelectorAll("li");
+  upgradeElements.forEach((elem) => {
+    const upgradeId = Number(elem.dataset.upgradeId);
+    const upgrade = upgradeData.find((u) => u.id === upgradeId);
+    const purchasedUpgrade = gameState.upgrades.find((u) => u.id === upgradeId);
+    const upgradeButton = elem.querySelector(
+      ".upgrade-button",
+    ) as HTMLButtonElement;
+    const levelElem = elem.querySelector(".upgrade-level") as HTMLElement;
+
+    // Highlight purchased upgrades and show level
+    if (purchasedUpgrade) {
+      elem.classList.add("purchased");
+      if (levelElem) {
+        levelElem.textContent = `Level: ${purchasedUpgrade.level}`;
+      }
+    } else {
+      elem.classList.remove("purchased");
+      if (levelElem) {
+        levelElem.textContent = "";
+      }
+    }
+
+    // Disable button if not affordable
+    const currentLevel = purchasedUpgrade?.level || 0;
+    const cost = calculateCost(currentLevel, upgrade!.baseCost);
+    upgradeButton.disabled = gameState.currency < cost;
+  });
 }
 
 function updatePerformanceMetrics() {
@@ -252,6 +293,12 @@ setInterval(updatePerformanceMetrics, 1000);
 setInterval(() => {
   document.title = `NuclearClick - $${gameState.currency.toFixed(2)}`;
 }, 2000);
+setInterval(() => {
+  clickIncomeDisplay.textContent = `+${
+    calculateClickValue() * clicksThisSecond
+  }`;
+  clicksThisSecond = 0;
+}, 1000);
 
 // Start loops
 setInterval(logicUpdate, LOGIC_TIME_STEP);
