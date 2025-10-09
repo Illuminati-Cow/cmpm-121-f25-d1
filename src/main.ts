@@ -82,12 +82,13 @@ constructionTabButton.addEventListener(
   "click",
   () => swapUpgradeTab("construction"),
 );
-swapUpgradeTab("mining");
 
 const gameState: GameState = {
   currency: 0,
   upgrades: [],
 };
+
+swapUpgradeTab("mining");
 
 // TODO: Implement upgrade purchasing, effects, and scaling
 // TODO: Consider pre-creating DOM elements for upgrades and reusing them
@@ -111,7 +112,9 @@ function createUpgradeElement(upgrade: Upgrade): HTMLLIElement {
   const costElem = fragment.querySelector(".upgrade-cost")!;
   listItem.dataset.upgradeId = upgrade.id.toString();
   nameElem.textContent = upgrade.name;
-  costElem.textContent = `$${upgrade.baseCost.toFixed(2)}`;
+  costElem.textContent = `$${
+    calculateCost(getUpgradeLevel(upgrade.id), upgrade.baseCost).toFixed(2)
+  }`;
   const upgradeButton = fragment.querySelector(".upgrade-button")!;
   upgradeButton.addEventListener("click", () => purchaseUpgrade(upgrade.id));
 
@@ -149,6 +152,11 @@ function updatePassiveIncome() {
 
 function calculateCost(level: number, baseCost: number): number {
   return 1.5 ** level * baseCost;
+}
+
+function getUpgradeLevel(upgradeId: number): number {
+  const upgrade = gameState.upgrades.find((u) => u.id === upgradeId);
+  return upgrade ? upgrade.level : 0;
 }
 
 let lastTick = performance.now();
