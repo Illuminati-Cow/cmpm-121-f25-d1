@@ -53,7 +53,9 @@ const clickPowerDisplay = document.getElementById(
 const incomeDisplay = document.getElementById(
   "income-display",
 ) as HTMLParagraphElement;
-const _canvas = document.getElementById("game-canvas") as HTMLCanvasElement;
+const canvas = document.getElementById("game-canvas") as HTMLCanvasElement;
+canvas.width = 800;
+canvas.height = 200;
 const performanceMetrics = document.getElementById(
   "performance-metrics",
 ) as HTMLParagraphElement;
@@ -168,12 +170,14 @@ function getUpgradeLevel(upgradeId: number): number {
 
 let lastTick = performance.now();
 let clicksThisSecond = 0;
+let pendingTrucks = 0;
 
 function logicUpdate() {
   const delta = (performance.now() - lastTick) / 1000;
   lastTick = performance.now();
   consumeClicks(pendingClicks);
   clicksThisSecond += pendingClicks;
+  pendingTrucks = pendingClicks;
   pendingClicks = 0;
   tickUpgrades(delta);
 }
@@ -182,7 +186,39 @@ function enterRenderLoop() {
   renderDelta = performance.now() - lastRenderUpdate;
   lastRenderUpdate = performance.now();
   updateStatsDisplay();
+  updateUpgradeDisplay();
+  drawTrucks(pendingTrucks, renderDelta / 1000);
+  pendingTrucks = 0;
   requestAnimationFrame(enterRenderLoop);
+}
+
+const trucks: Array<{ x: number }> = [];
+
+function drawTrucks(truckCount: number, delta: number) {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  // Clear canvas
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Add new trucks
+  for (let i = 0; i < truckCount; i++) {
+    trucks.push({ x: 150 });
+  }
+
+  // Update and draw trucks
+  trucks.forEach((truck, index) => {
+    truck.x += 300 * delta; // Move truck to the right
+    ctx.scale(-1, 1);
+    ctx.font = "40px serif";
+    ctx.fillText("🚚", -truck.x, 50);
+    ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform
+
+    // Remove trucks that have moved off screen
+    if (truck.x > canvas.width + 100) {
+      trucks.splice(index, 1);
+    }
+  });
 }
 
 function consumeClicks(clicks: number) {
@@ -235,7 +271,7 @@ function updateUpgradeDisplay() {
     if (purchasedUpgrade) {
       elem.classList.add("purchased");
       if (levelElem) {
-        levelElem.textContent = `Level: ${purchasedUpgrade.level}`;
+        levelElem.textContent = `${purchasedUpgrade.level}`;
       }
     } else {
       elem.classList.remove("purchased");
