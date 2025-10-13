@@ -37,6 +37,11 @@ type PurchasedUpgrade = Upgrade & {
   level: number;
 };
 
+const clickSound = new Audio("click.wav");
+clickSound.volume = 0.5;
+clickSound.load();
+document.body.appendChild(clickSound);
+
 //#region DOM Elements
 const mainClicker = document.getElementById(
   "main-clicker",
@@ -257,7 +262,7 @@ function drawClickToasts(
   ctx: CanvasRenderingContext2D,
 ) {
   const pos = getCanvasPosition(mainClicker);
-  const offsetY = mainClicker.getBoundingClientRect().height / 2;
+  const offsetY = mainClicker.getBoundingClientRect().height / 2 + 20;
   const toastsPerClick = 1;
   const maxToastsPerFrame = 5;
   const totalToasts = Math.min(clicks * toastsPerClick, maxToastsPerFrame);
@@ -271,7 +276,7 @@ function drawClickToasts(
 
   ctx.save();
   clickToasts.forEach((toast) => {
-    toast.y -= 100 * delta;
+    toast.y -= 200 * delta;
     toast.alpha -= 3 * delta;
     ctx.globalAlpha = Math.max(0, toast.alpha);
     ctx.drawImage(
@@ -389,6 +394,7 @@ function getCanvasPosition(element: HTMLElement) {
 
 function consumeClicks(clicks: number) {
   gameState.currency += clicks * calculateClickValue();
+  clicks > 0 && clickSound.play();
 }
 
 function tickUpgrades(_delta: number) {
