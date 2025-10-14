@@ -1,4 +1,37 @@
 [
-  { "id": 0, "name": "Ore Extractor", "type": "construction", "baseCost": 10 },
-  { "id": 1, "name": "Drill Upgrade", "type": "mining", "baseCost": 100 }
+  {
+    "id": 0,
+    "name": "Drill Hardening",
+    "type": "mining",
+    "baseCost": 100,
+    "value": 1
+  },
+  {
+    "id": 1,
+    "name": "Ore Extractor",
+    "type": "construction",
+    "baseCost": 10,
+    "value": 0.25
+  },
+  {
+    "id": 2,
+    "name": "Centrifuge",
+    "type": "construction",
+    "baseCost": 100,
+    "value": 3
+  },
+  {
+    "id": 3,
+    "name": "Enrichment Facility",
+    "type": "construction",
+    "baseCost": 1000,
+    "value": 30
+  },
+  {
+    "id": 4,
+    "name": "Fuel Rod Plant",
+    "type": "construction",
+    "baseCost": 500000,
+    "value": 100
+  }
 ]
