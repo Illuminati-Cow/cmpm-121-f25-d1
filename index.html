@@ -38,7 +38,7 @@
       </div>
       <div id="upgrades-box">
         <h1>Upgrades</h1>
-        <nav id="upgrade-tabs">
+        <!-- <nav id="upgrade-tabs">
           <button
             id="mining-tab-button"
             title="Mining"
@@ -51,14 +51,17 @@
           >
             ⚒️
           </button>
-        </nav>
+        </nav> -->
         <ol class="upgrade-tab" id="upgrades-list">
           <template id="upgrade-item-template">
             <li>
               <button class="upgrade-button">
                 <div class="upgrade-info">
-                  <span class="upgrade-name"></span>
-                  <span class="upgrade-cost"></span>
+                  <div>
+                    <div class="upgrade-name"></div>
+                    <div class="upgrade-cost"></div>
+                  </div>
+                  <span class="upgrade-level"></span>
                 </div>
                 <div class="upgrade-description"></div>
               </button>
@@ -183,12 +186,48 @@
     border-radius: 5px;
   }
 
+  .upgrade-button {
+    width: 100%;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: 1em;
+    border-radius: 0.5em;
+  }
+
+  .upgrade-button:disabled {
+    background: #cccccc;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+  }
+
+  .upgrade-button:disabled:hover {
+    transform: none;
+  }
+
+  .upgrade-info {
+    margin: 0;
+    padding: 0;
+    display: grid;
+    justify-content: space-evenly;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+  }
+
+  .upgrade-level {
+    font-size: 1.5em;
+    color: #666;
+    text-align: right;
+    padding-right: 0.5ch;
+  }
+
   #game-canvas {
     position: fixed;
     bottom: 0;
     left: 0;
-    width: 100%;
-    height: 50%;
+    width: 100vw;
     z-index: -1;
   }
 
