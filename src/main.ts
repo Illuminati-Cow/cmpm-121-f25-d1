@@ -50,22 +50,11 @@ const miningTabButton = document.getElementById(
 ) as HTMLButtonElement;
 //#endregion
 
-const upgradeData: Upgrade[] = [
-  {
-    id: 0,
-    name: "Ore Extractor",
-    type: "construction",
-    baseCost: 100,
-    costScaling: null,
-  },
-  {
-    id: 1,
-    name: "Drill Upgrade",
-    type: "mining",
-    baseCost: 10,
-    costScaling: null,
-  },
-];
+//#region Load Data
+const upgradeData: Upgrade[] = await fetch("/data/upgrades.json")
+  .then((res) => res.json())
+  .then((data) => data as Upgrade[]);
+//#endregion
 
 globalThis.runGameLoop = true;
 let delta: number;
