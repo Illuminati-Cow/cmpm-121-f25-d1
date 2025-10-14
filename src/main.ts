@@ -4,9 +4,26 @@ declare global {
   var runGameLoop: boolean;
 }
 
+globalThis.runGameLoop = true;
+let renderDelta: number;
+let lastRenderUpdate: number = performance.now();
+let clickPower = 1;
+
+// Pending clicks to be consumed in logic updates
+let pendingClicks = 0;
+
+// Fixed timestep for logic updates (60 ticks per second)
+const LOGIC_TICK_RATE = 60;
+const LOGIC_TIME_STEP = 1000 / LOGIC_TICK_RATE; // ~16.67ms
+
+type SerializedGameState = {
+  currency: number;
+  upgrades: Map<number, number>;
+};
+
 type GameState = {
   currency: number;
-  upgrades: Map<number, Upgrade>;
+  upgrades: Array<PurchasedUpgrade>;
 };
 
 type Upgrade = {
@@ -14,7 +31,10 @@ type Upgrade = {
   name: string;
   type: string;
   baseCost: number;
-  costScaling: null | ((level: number) => number);
+};
+
+type PurchasedUpgrade = Upgrade & {
+  level: number;
 };
 
 //#region DOM Elements
@@ -56,13 +76,7 @@ const upgradeData: Upgrade[] = await fetch("data/upgrades.json")
   .then((data) => data as Upgrade[]);
 //#endregion
 
-globalThis.runGameLoop = true;
-let delta: number;
-let lastUpdate: number = performance.now();
-let clicksThisFrame: number = 0;
-let clickPower = 1;
-
-mainClicker.addEventListener("click", () => clicksThisFrame++);
+mainClicker.addEventListener("click", () => pendingClicks++);
 miningTabButton.addEventListener("click", () => swapUpgradeTab("mining"));
 constructionTabButton.addEventListener(
   "click",
@@ -72,7 +86,7 @@ swapUpgradeTab("mining");
 
 const gameState: GameState = {
   currency: 0,
-  upgrades: new Map<number, Upgrade>(),
+  upgrades: [],
 };
 
 // TODO: Implement upgrade purchasing, effects, and scaling
@@ -95,6 +109,7 @@ function createUpgradeElement(upgrade: Upgrade): HTMLLIElement {
   const listItem = fragment.querySelector("li")!;
   const nameElem = fragment.querySelector(".upgrade-name")!;
   const costElem = fragment.querySelector(".upgrade-cost")!;
+  listItem.dataset.upgradeId = upgrade.id.toString();
   nameElem.textContent = upgrade.name;
   costElem.textContent = `$${upgrade.baseCost.toFixed(2)}`;
   const upgradeButton = fragment.querySelector(".upgrade-button")!;
@@ -103,18 +118,53 @@ function createUpgradeElement(upgrade: Upgrade): HTMLLIElement {
   return listItem;
 }
 
-function enterGameLoop() {
-  delta = performance.now() - lastUpdate;
-  lastUpdate = performance.now();
-  update(delta);
-  requestAnimationFrame(enterGameLoop);
+function updateUpgradeCost(upgradeId: number) {
+  //TODO: Update the displayed cost of the upgrade based on its new level
+  const upgrade = upgradeData.find((u) => u.id === upgradeId);
+  if (!upgrade) return;
+  const currentLevel =
+    gameState.upgrades.find((u) => u.id === upgradeId)?.level || 0;
+  const newCost = calculateCost(currentLevel, upgrade.baseCost);
+
+  // Find the corresponding upgrade element in the DOM and update its cost display
+  const upgradeElements = upgradeList.querySelectorAll("li");
+  upgradeElements.forEach((elem) => {
+    const costElem = elem.querySelector(".upgrade-cost");
+    if (costElem && elem.dataset.upgradeId === upgradeId.toString()) {
+      costElem.textContent = `$${newCost.toFixed(2)}`;
+    }
+  });
 }
 
-function update(delta: number) {
-  consumeClicks(clicksThisFrame);
-  clicksThisFrame = 0;
+function updatePassiveIncome() {
+  // TODO: Calculate and update passive income based on purchased upgrades
+  let income = 0;
+  gameState.upgrades.forEach((upgrade) => {
+    if (upgrade.type === "construction") {
+      income += upgrade.level * 0.1; // PLACEHOLDER
+    }
+  });
+  incomeDisplay.textContent = `$${income.toFixed(2)}`;
+}
+
+function calculateCost(_level: number, baseCost: number): number {
+  return baseCost;
+}
+
+let lastTick = performance.now();
+function logicUpdate() {
+  const delta = (performance.now() - lastTick) / 1000;
+  lastTick = performance.now();
+  consumeClicks(pendingClicks);
+  pendingClicks = 0;
   tickUpgrades(delta);
+}
+
+function enterRenderLoop() {
+  renderDelta = performance.now() - lastRenderUpdate;
+  lastRenderUpdate = performance.now();
   updateDisplay();
+  requestAnimationFrame(enterRenderLoop);
 }
 
 function consumeClicks(clicks: number) {
@@ -122,7 +172,11 @@ function consumeClicks(clicks: number) {
 }
 
 function tickUpgrades(_delta: number) {
-  return;
+  gameState.upgrades.forEach((upgrade) => {
+    if (upgrade.type === "construction") {
+      gameState.currency += upgrade.level * 0.1 * _delta; // PLACEHOLDER
+    }
+  });
 }
 
 let displayedCurrency = 0;
@@ -130,7 +184,12 @@ const currencyAnimationSpeed = 10;
 function updateDisplay() {
   // Animate the displayed currency towards the actual currency
   const diff = gameState.currency - displayedCurrency;
-  displayedCurrency += diff * (currencyAnimationSpeed * delta / 1000);
+  if (renderDelta > 1000) {
+    // If the frame took too long, snap to the actual value to avoid large jumps
+    displayedCurrency = gameState.currency;
+  } else {
+    displayedCurrency += diff * (currencyAnimationSpeed * renderDelta / 1000);
+  }
 
   // Snap to exact value if very close to avoid floating point issues
   if (Math.abs(gameState.currency - displayedCurrency) < 0.01) {
@@ -144,8 +203,8 @@ function updateDisplay() {
 }
 
 function updatePerformanceMetrics() {
-  const fps = (1000 / delta).toFixed(1);
-  const msPerFrame = delta.toFixed(2);
+  const fps = (1000 / renderDelta).toFixed(1);
+  const msPerFrame = renderDelta.toFixed(2);
   performanceMetrics!.textContent = `${fps} FPS | ${msPerFrame} ms/frame`;
 }
 
@@ -153,21 +212,24 @@ function updatePerformanceMetrics() {
 function purchaseUpgrade(upgradeId: number) {
   const upgrade = upgradeData.find((u) => u.id === upgradeId);
   if (!upgrade) return;
+  const purchasedUpgrade = gameState.upgrades.find((u) => u.id === upgradeId);
+  const currentLevel = purchasedUpgrade?.level || 0;
+  const cost = calculateCost(currentLevel, upgrade.baseCost);
+  if (gameState.currency < cost) return;
 
-  if (gameState.currency >= upgrade.baseCost) {
-    gameState.currency -= upgrade.baseCost;
-    gameState.upgrades.set(upgradeId, upgrade);
+  gameState.currency -= cost;
+  if (purchasedUpgrade) {
+    purchasedUpgrade.level += 1;
+  } else {
+    gameState.upgrades.push({ ...upgrade, level: 1 });
   }
+
+  updateUpgradeCost(upgradeId);
 
   if (upgrade.type === "construction") {
-    setInterval(() => {
-      gameState.currency += 1; // PLACEHOLDER
-    }, 1000);
-    incomeDisplay.textContent = new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-    }).format(1); // PLACEHOLDER
+    updatePassiveIncome();
   }
+
   if (upgrade.type === "mining") {
     clickPower += 1; // PLACEHOLDER
     clickPowerDisplay.textContent = new Intl.NumberFormat("en-US", {
@@ -179,6 +241,10 @@ function purchaseUpgrade(upgradeId: number) {
 
 // Update performance metrics every second
 setInterval(updatePerformanceMetrics, 1000);
+setInterval(() => {
+  document.title = `NuclearClick - $${gameState.currency.toFixed(2)}`;
+}, 2000);
 
-// Start Game Loop
-enterGameLoop();
+// Start loops
+setInterval(logicUpdate, LOGIC_TIME_STEP);
+enterRenderLoop();

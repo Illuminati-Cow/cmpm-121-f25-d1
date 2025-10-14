@@ -1,4 +1,4 @@
 [
-  { "id": 0, "name": "Ore Extractor", "type": "construction", "baseCost": 100 },
-  { "id": 1, "name": "Drill Upgrade", "type": "mining", "baseCost": 10 }
+  { "id": 0, "name": "Ore Extractor", "type": "construction", "baseCost": 10 },
+  { "id": 1, "name": "Drill Upgrade", "type": "mining", "baseCost": 100 }
 ]
