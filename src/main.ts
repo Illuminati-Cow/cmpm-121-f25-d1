@@ -28,6 +28,7 @@ type GameState = {
 type Upgrade = {
   id: number;
   name: string;
+  description: string;
   type: string;
   baseCost: number;
   value: number;
@@ -36,6 +37,10 @@ type Upgrade = {
 type PurchasedUpgrade = Upgrade & {
   level: number;
 };
+
+interface UpgradePurchasedEventDetail {
+  upgradeId: number;
+}
 
 const clickSound = new Audio("click.wav");
 clickSound.volume = 0.5;
@@ -135,12 +140,73 @@ function createUpgradeElement(upgrade: Upgrade): HTMLLIElement {
       1000,
     )
   }`;
+
   const upgradeButton = fragment.querySelector(".upgrade-button")!;
   upgradeButton.addEventListener("click", () => purchaseUpgrade(upgrade.id));
+
+  const tooltip = document.getElementById("upgrade-tooltip")!;
+  let tooltipUpdateHandler: (() => void) | null = null;
+  upgradeButton.addEventListener("mouseover", () => {
+    updateTooltipContent(upgrade);
+    tooltip.style.display = "block";
+    const tooltipRect = tooltip.getBoundingClientRect();
+    const rect = upgradeButton.getBoundingClientRect();
+    tooltip.style.top = `${rect.top}px`;
+    tooltip.style.left = `${rect.left - tooltipRect.width - 10}px`;
+    tooltip.style.opacity = "1";
+    tooltipUpdateHandler = () => updateTooltipContent(upgrade);
+    document.addEventListener("upgradePurchased", tooltipUpdateHandler);
+  });
+  upgradeButton.addEventListener("mouseout", () => {
+    tooltip.style.opacity = "0";
+    if (tooltipUpdateHandler) {
+      document.removeEventListener("upgradePurchased", tooltipUpdateHandler);
+      tooltipUpdateHandler = null;
+    }
+  });
 
   return listItem;
 }
 
+function updateTooltipContent(upgrade: Upgrade) {
+  const tooltip = document.getElementById("upgrade-tooltip")!;
+  const tooltipDescription = tooltip.querySelector(
+    ".upgrade-tooltip-description",
+  )!;
+  const tooltipValue = tooltip.querySelector(".upgrade-tooltip-value")!;
+  const tooltipTotalValue = tooltip.querySelector(
+    ".upgrade-tooltip-total-value",
+  )!;
+  const tooltipCost = tooltip.querySelector(".upgrade-tooltip-cost")!;
+  const tooltipLevel = tooltip.querySelector(".upgrade-tooltip-level")!;
+  tooltipDescription.textContent = upgrade.description;
+  tooltipCost.textContent = `Cost: ${
+    formatDollar(
+      calculateCost(
+        getUpgradeLevel(upgrade.id),
+        upgrade.baseCost,
+        upgrade.type,
+      ),
+      1000,
+    )
+  }`;
+  tooltipLevel.textContent = `Level: ${getUpgradeLevel(upgrade.id)}`;
+  tooltipValue.textContent = `Value: +${formatDollar(upgrade.value, 1000)}/${
+    upgrade.type === "mining" ? "click" : "s"
+  }`;
+  const totalValue =
+    (gameState.upgrades.find((u) => u.id === upgrade.id)?.level || 0) *
+    upgrade.value;
+  if (upgrade.type === "construction") {
+    tooltipTotalValue.textContent = `Total Value: +${
+      formatDollar(totalValue, 1000)
+    }/s`;
+  } else {
+    tooltipTotalValue.textContent = `Total Value: +${
+      formatDollar(totalValue, 1000)
+    }/click`;
+  }
+}
 function updateUpgradeCost(upgradeId: number) {
   const upgrade = upgradeData.find((u) => u.id === upgradeId);
   if (!upgrade) return;
@@ -468,6 +534,12 @@ function purchaseUpgrade(upgradeId: number) {
   } else {
     gameState.upgrades.push({ ...upgrade, level: 1 });
   }
+
+  document.dispatchEvent(
+    new CustomEvent<UpgradePurchasedEventDetail>("upgradePurchased", {
+      detail: { upgradeId },
+    }),
+  );
 
   updateUpgradeCost(upgradeId);
 

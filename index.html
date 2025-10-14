@@ -56,6 +56,13 @@
         </ol>
       </div>
     </div>
+    <div id="upgrade-tooltip">
+      <p class="upgrade-tooltip-description"></p>
+      <p class="upgrade-tooltip-cost"></p>
+      <p class="upgrade-tooltip-level"></p>
+      <p class="upgrade-tooltip-value"></p>
+      <p class="upgrade-tooltip-total-value"></p>
+    </div>
     <canvas id="game-canvas"></canvas>
     <p
       id="performance-metrics"
@@ -209,6 +216,23 @@
     color: #666;
     text-align: right;
     padding-right: 0.5ch;
+  }
+
+  #upgrade-tooltip {
+    display: none;
+    position: absolute;
+    background: whitesmoke;
+    border: black 2px solid;
+    border-radius: 0.125em;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    padding: 10px;
+    z-index: 10;
+    width: max-content;
+    max-width: 200px;
+    font-size: 0.875em;
+    color: #333;
+    pointer-events: none;
+    transition: opacity 0.2s ease-in-out;
   }
 
   #game-canvas {
