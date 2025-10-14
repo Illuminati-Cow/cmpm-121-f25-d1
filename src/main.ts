@@ -147,8 +147,8 @@ function updatePassiveIncome() {
   incomeDisplay.textContent = `$${income.toFixed(2)}`;
 }
 
-function calculateCost(_level: number, baseCost: number): number {
-  return baseCost;
+function calculateCost(level: number, baseCost: number): number {
+  return 1.5 ** level * baseCost;
 }
 
 let lastTick = performance.now();
