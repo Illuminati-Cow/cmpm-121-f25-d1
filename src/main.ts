@@ -12,9 +12,8 @@ let clickPower = 1;
 // Pending clicks to be consumed in logic updates
 let pendingClicks = 0;
 
-// Fixed timestep for logic updates (60 ticks per second)
 const LOGIC_TICK_RATE = 60;
-const LOGIC_TIME_STEP = 1000 / LOGIC_TICK_RATE; // ~16.67ms
+const LOGIC_TIME_STEP = 1000 / LOGIC_TICK_RATE;
 
 type SerializedGameState = {
   currency: number;
@@ -31,6 +30,7 @@ type Upgrade = {
   name: string;
   type: string;
   baseCost: number;
+  value: number;
 };
 
 type PurchasedUpgrade = Upgrade & {
@@ -91,12 +91,6 @@ const upgradeTemplate = document.getElementById(
 const upgradeList = document.getElementById(
   "upgrades-list",
 ) as HTMLOListElement;
-const constructionTabButton = document.getElementById(
-  "construction-tab-button",
-) as HTMLButtonElement;
-const miningTabButton = document.getElementById(
-  "mining-tab-button",
-) as HTMLButtonElement;
 //#endregion
 
 //#region Load Data
@@ -106,27 +100,17 @@ const upgradeData: Upgrade[] = await fetch("data/upgrades.json")
 //#endregion
 
 mainClicker.addEventListener("click", () => pendingClicks++);
-miningTabButton.addEventListener("click", () => swapUpgradeTab("mining"));
-constructionTabButton.addEventListener(
-  "click",
-  () => swapUpgradeTab("construction"),
-);
 
 const gameState: GameState = {
   currency: 0,
   upgrades: [],
 };
 
-swapUpgradeTab("mining");
+loadUpgrades();
 
-// TODO: Implement upgrade purchasing, effects, and scaling
-// TODO: Consider pre-creating DOM elements for upgrades and reusing them
-function swapUpgradeTab(tab: string) {
+function loadUpgrades() {
   upgradeList.innerHTML = "";
-  const filteredUpgrades = upgradeData.filter((upgrade) =>
-    upgrade.type === tab
-  );
-  filteredUpgrades.forEach((upgrade) => {
+  upgradeData.forEach((upgrade) => {
     upgradeList.appendChild(createUpgradeElement(upgrade));
   });
 }
@@ -141,8 +125,15 @@ function createUpgradeElement(upgrade: Upgrade): HTMLLIElement {
   const costElem = fragment.querySelector(".upgrade-cost")!;
   listItem.dataset.upgradeId = upgrade.id.toString();
   nameElem.textContent = upgrade.name;
-  costElem.textContent = `$${
-    calculateCost(getUpgradeLevel(upgrade.id), upgrade.baseCost).toFixed(2)
+  costElem.textContent = `${
+    formatDollar(
+      calculateCost(
+        getUpgradeLevel(upgrade.id),
+        upgrade.baseCost,
+        upgrade.type,
+      ),
+      1000,
+    )
   }`;
   const upgradeButton = fragment.querySelector(".upgrade-button")!;
   upgradeButton.addEventListener("click", () => purchaseUpgrade(upgrade.id));
@@ -151,14 +142,12 @@ function createUpgradeElement(upgrade: Upgrade): HTMLLIElement {
 }
 
 function updateUpgradeCost(upgradeId: number) {
-  //TODO: Update the displayed cost of the upgrade based on its new level
   const upgrade = upgradeData.find((u) => u.id === upgradeId);
   if (!upgrade) return;
   const currentLevel =
     gameState.upgrades.find((u) => u.id === upgradeId)?.level || 0;
-  const newCost = calculateCost(currentLevel, upgrade.baseCost);
+  const newCost = calculateCost(currentLevel, upgrade.baseCost, upgrade.type);
 
-  // Find the corresponding upgrade element in the DOM and update its cost display
   const upgradeElements = upgradeList.querySelectorAll("li");
   upgradeElements.forEach((elem) => {
     const costElem = elem.querySelector(".upgrade-cost");
@@ -169,18 +158,17 @@ function updateUpgradeCost(upgradeId: number) {
 }
 
 function updatePassiveIncome() {
-  // TODO: Calculate and update passive income based on purchased upgrades
   let income = 0;
   gameState.upgrades.forEach((upgrade) => {
     if (upgrade.type === "construction") {
-      income += upgrade.level * 0.1; // PLACEHOLDER
+      income += upgrade.level * upgrade.value;
     }
   });
   incomeDisplay.textContent = `$${income.toFixed(2)}`;
 }
 
-function calculateCost(level: number, baseCost: number): number {
-  return 1.5 ** level * baseCost;
+function calculateCost(level: number, baseCost: number, type: string): number {
+  return (type === "mining" ? 10 : 1.15) ** level * baseCost;
 }
 
 function calculateClickValue(): number {
@@ -232,9 +220,9 @@ function drawClickEffects(
   ctx: CanvasRenderingContext2D,
 ) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  drawClickToasts(clicks, delta, ctx);
-  drawClickParticles(clicks, delta, ctx);
   drawTrucks(clicks, delta, ctx);
+  drawClickParticles(clicks, delta, ctx);
+  drawClickToasts(clicks, delta, ctx);
 }
 
 //#region Pre-render the toast text on an offscreen canvas
@@ -400,7 +388,7 @@ function consumeClicks(clicks: number) {
 function tickUpgrades(_delta: number) {
   gameState.upgrades.forEach((upgrade) => {
     if (upgrade.type === "construction") {
-      gameState.currency += upgrade.level * 0.1 * _delta; // PLACEHOLDER
+      gameState.currency += upgrade.level * upgrade.value * _delta;
     }
   });
 }
@@ -454,7 +442,7 @@ function updateUpgradeDisplay() {
 
     // Disable button if not affordable
     const currentLevel = purchasedUpgrade?.level || 0;
-    const cost = calculateCost(currentLevel, upgrade!.baseCost);
+    const cost = calculateCost(currentLevel, upgrade!.baseCost, upgrade!.type);
     upgradeButton.disabled = gameState.currency < cost;
   });
 }
@@ -471,7 +459,7 @@ function purchaseUpgrade(upgradeId: number) {
   if (!upgrade) return;
   const purchasedUpgrade = gameState.upgrades.find((u) => u.id === upgradeId);
   const currentLevel = purchasedUpgrade?.level || 0;
-  const cost = calculateCost(currentLevel, upgrade.baseCost);
+  const cost = calculateCost(currentLevel, upgrade.baseCost, upgrade.type);
   if (gameState.currency < cost) return;
 
   gameState.currency -= cost;
@@ -488,13 +476,43 @@ function purchaseUpgrade(upgradeId: number) {
   }
 
   if (upgrade.type === "mining") {
-    clickPower += 1; // PLACEHOLDER
+    clickPower += upgrade.value;
     clickPowerDisplay.textContent = new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
     }).format(clickPower);
     prerenderToastText();
   }
+}
+
+function formatDollar(num: number, threshold: number): string {
+  const suffixes = [
+    "",
+    "k",
+    "M",
+    "B",
+    "T",
+    "Q",
+    "Qi",
+    "Sx",
+    "Sp",
+    "Oc",
+    "No",
+    "Dc",
+  ];
+  if (num < threshold) {
+    return `$${num.toFixed(2)}`;
+  }
+  let suffixIndex = 0;
+  const sign = Math.sign(num);
+  num = Math.abs(num);
+  while (num >= 1000 && suffixIndex < suffixes.length - 1) {
+    num /= 1000;
+    suffixIndex++;
+  }
+  return `$${sign < 0 ? "-" : ""}${num.toFixed(1).replace(/\.0$/, "")}${
+    suffixes[suffixIndex]
+  }`;
 }
 
 // Update performance metrics every second
