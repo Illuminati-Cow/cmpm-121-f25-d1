@@ -1,26 +1,30 @@
 import "./style.css";
 
 declare global {
-  interface Window {
-    runGameLoop: boolean
-  }
+  var runGameLoop: boolean;
 }
 
 type GameState = {
-  currency: number,
-  upgrades: Map<number, Upgrade>,
+  currency: number;
+  upgrades: Map<number, Upgrade>;
 };
 
 type Upgrade = {
-  id: number,
-  name: string,
-  quantity: number,
+  id: number;
+  name: string;
+  quantity: number;
 };
 
-const mainClicker = document.getElementById("main-clicer")
-if (!mainClicker)
-  throw new Error("mainClicker element not found.");
-mainClicker.addEventListener("click", () => clicksThisFrame++)
+//#region DOM Elements
+const mainClicker = document.getElementById(
+  "main-clicker",
+) as HTMLButtonElement;
+const currencyDisplay = document.getElementById(
+  "currency-display",
+) as HTMLParagraphElement;
+const _canvas = document.getElementById("game-canvas") as HTMLCanvasElement;
+
+//#endregion
 
 window.runGameLoop = true;
 let delta: number
