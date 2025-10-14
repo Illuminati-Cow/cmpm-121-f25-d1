@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>NuclearClick</title>
-    <link rel="icon" href="data:," />
+    <link rel="icon" href="./atom.png" />
   </head>
 
   <body>
@@ -38,20 +38,6 @@
       </div>
       <div id="upgrades-box">
         <h1>Upgrades</h1>
-        <!-- <nav id="upgrade-tabs">
-          <button
-            id="mining-tab-button"
-            title="Mining"
-          >
-            ⛏️
-          </button>
-          <button
-            id="construction-tab-button"
-            title="Construction"
-          >
-            ⚒️
-          </button>
-        </nav> -->
         <ol class="upgrade-tab" id="upgrades-list">
           <template id="upgrade-item-template">
             <li>
@@ -212,7 +198,9 @@
     padding: 0;
     display: grid;
     justify-content: space-evenly;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 2fr 1fr;
+    overflow: hidden;
+    text-wrap: nowrap;
     align-items: center;
   }
 
