@@ -28,7 +28,7 @@
     "name": "Enrichment Facility",
     "description": "Processes uranium to increase the concentration of U-235.",
     "type": "construction",
-    "baseCost": 1000,
+    "baseCost": 1500,
     "value": 30
   },
   {
@@ -36,7 +36,15 @@
     "name": "Fuel Rod Plant",
     "description": "Manufactures fuel rods for nuclear reactors.",
     "type": "construction",
-    "baseCost": 500000,
-    "value": 100
+    "baseCost": 100000,
+    "value": 500
+  },
+  {
+    "id": 5,
+    "name": "Fission Reactor",
+    "description": "Generates massive amounts of energy through nuclear fission.",
+    "type": "construction",
+    "baseCost": 1000000,
+    "value": 2500
   }
 ]
