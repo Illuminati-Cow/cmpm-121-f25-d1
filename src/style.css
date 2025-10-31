@@ -40,9 +40,9 @@ button:hover:not(:active) {
   display: grid;
   grid-template-columns: 200px auto 200px;
   top: 10svh;
-  left: 0;
-  width: 80%;
+  width: max(90%, 450px);
   height: 80%;
+  margin: auto;
 }
 
 #income-box {
@@ -54,6 +54,7 @@ button:hover:not(:active) {
   border-radius: 8px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   width: 200px;
+  height: min-content;
 }
 
 #income-box p {
@@ -76,9 +77,16 @@ button:hover:not(:active) {
   padding: 0px 10px 20px 15px;
   border-radius: 8px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  width: 200px;
-  max-height: 70vh;
+  width: clamp(200px, 20vw, 250px);
+  max-height: 50vh;
+  overflow: none;
+}
+
+#upgrades-box > div {
   overflow-y: auto;
+  max-height: 250px;
+  scrollbar-width: 10px;
+  scrollbar-color: #9eff95;
 }
 
 #upgrades-box ol {
@@ -122,6 +130,16 @@ button:hover:not(:active) {
 
 .upgrade-button:disabled:hover {
   transform: none;
+}
+
+.upgrade-name {
+  font-size: 1.25em;
+  font-weight: bold;
+  margin: 0;
+  padding: 0;
+  color: #222;
+  overflow-x: visible;
+  overflow-y: hidden;
 }
 
 .upgrade-info {
@@ -169,13 +187,19 @@ button:hover:not(:active) {
 
 #main-clicker {
   background: #fff955;
-  font-size: 3vw;
+  font-size: max(3vw, 48px);
   cursor: pointer;
   position: fixed;
   padding: 0.125em;
   left: 10%;
-  bottom: 25%;
+  bottom: 50px;
   border: black 2px solid;
   border-radius: 0.125em;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+@media (min-width: 1000px) {
+  #main-clicker {
+    bottom: 25%;
+  }
 }
