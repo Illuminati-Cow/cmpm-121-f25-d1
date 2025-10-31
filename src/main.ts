@@ -2,9 +2,11 @@ import "./style.css";
 
 declare global {
   var runGameLoop: boolean;
+  function setMoney(money: number): number;
 }
 
 globalThis.runGameLoop = true;
+globalThis.setMoney = (money: number) => gameState.currency = money;
 let renderDelta: number;
 let lastRenderUpdate: number = performance.now();
 let clickPower = 1;
@@ -32,6 +34,7 @@ type Upgrade = {
   type: string;
   baseCost: number;
   value: number;
+  get cost(): number;
 };
 
 type PurchasedUpgrade = Upgrade & {
@@ -102,6 +105,27 @@ const upgradeList = document.getElementById(
 const upgradeData: Upgrade[] = await fetch("data/upgrades.json")
   .then((res) => res.json())
   .then((data) => data as Upgrade[]);
+upgradeData.forEach((upgrade: Upgrade) => {
+  Object.defineProperty(
+    upgrade,
+    "cost",
+    upgrade.type === "mining"
+      ? {
+        get() {
+          return 10 ** this.level * this.baseCost;
+        },
+        enumerable: true,
+        configurable: true,
+      }
+      : {
+        get() {
+          return 1.15 ** this.level * this.baseCost;
+        },
+        enumerable: true,
+        configurable: true,
+      },
+  );
+});
 //#endregion
 
 mainClicker.addEventListener("click", () => pendingClicks++);
@@ -130,16 +154,14 @@ function createUpgradeElement(upgrade: Upgrade): HTMLLIElement {
   const costElem = fragment.querySelector(".upgrade-cost")!;
   listItem.dataset.upgradeId = upgrade.id.toString();
   nameElem.textContent = upgrade.name;
-  costElem.textContent = `${
-    formatDollar(
-      calculateCost(
-        getUpgradeLevel(upgrade.id),
-        upgrade.baseCost,
-        upgrade.type,
-      ),
-      1000,
-    )
-  }`;
+  costElem.textContent = formatDollar(
+    calculateCost(
+      getUpgradeLevel(upgrade.id),
+      upgrade.baseCost,
+      upgrade.type,
+    ),
+    1000,
+  );
 
   const upgradeButton = fragment.querySelector(".upgrade-button")!;
   upgradeButton.addEventListener("click", () => purchaseUpgrade(upgrade.id));
@@ -190,22 +212,17 @@ function updateTooltipContent(upgrade: Upgrade) {
       1000,
     )
   }`;
+  const suffix = upgrade.type === "mining" ? "c" : "s";
   tooltipLevel.textContent = `Level: ${getUpgradeLevel(upgrade.id)}`;
-  tooltipValue.textContent = `Value: +${formatDollar(upgrade.value, 1000)}/${
-    upgrade.type === "mining" ? "click" : "s"
-  }`;
+  tooltipValue.textContent = `Value: +${
+    formatDollar(upgrade.value, 1000)
+  }/${suffix}`;
   const totalValue =
     (gameState.upgrades.find((u) => u.id === upgrade.id)?.level || 0) *
     upgrade.value;
-  if (upgrade.type === "construction") {
-    tooltipTotalValue.textContent = `Total Value: +${
-      formatDollar(totalValue, 1000)
-    }/s`;
-  } else {
-    tooltipTotalValue.textContent = `Total Value: +${
-      formatDollar(totalValue, 1000)
-    }/click`;
-  }
+  tooltipTotalValue.textContent = `Total Value: +${
+    formatDollar(totalValue, 1000)
+  }/${suffix}`;
 }
 function updateUpgradeCost(upgradeId: number) {
   const upgrade = upgradeData.find((u) => u.id === upgradeId);
@@ -218,7 +235,7 @@ function updateUpgradeCost(upgradeId: number) {
   upgradeElements.forEach((elem) => {
     const costElem = elem.querySelector(".upgrade-cost");
     if (costElem && elem.dataset.upgradeId === upgradeId.toString()) {
-      costElem.textContent = `$${newCost.toFixed(2)}`;
+      costElem.textContent = formatDollar(newCost, 1000, 3);
     }
   });
 }
@@ -230,7 +247,7 @@ function updatePassiveIncome() {
       income += upgrade.level * upgrade.value;
     }
   });
-  incomeDisplay.textContent = `$${income.toFixed(2)}`;
+  incomeDisplay.textContent = formatDollar(income, 1000);
 }
 
 function calculateCost(level: number, baseCost: number, type: string): number {
@@ -475,25 +492,21 @@ function updateStatsDisplay() {
   if (Math.abs(gameState.currency - displayedCurrency) < 0.01) {
     displayedCurrency = gameState.currency;
   }
-
-  currencyDisplay!.textContent = new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(displayedCurrency);
+  currencyDisplay.title = `$${gameState.currency.toFixed(2)}`;
+  currencyDisplay!.textContent = formatDollar(displayedCurrency, 10_000);
 }
 
 function updateUpgradeDisplay() {
   const upgradeElements = upgradeList.querySelectorAll("li");
   upgradeElements.forEach((elem) => {
     const upgradeId = Number(elem.dataset.upgradeId);
-    const upgrade = upgradeData.find((u) => u.id === upgradeId);
+    const upgrade = upgradeData.find((u) => u.id === upgradeId)!;
     const purchasedUpgrade = gameState.upgrades.find((u) => u.id === upgradeId);
     const upgradeButton = elem.querySelector(
       ".upgrade-button",
     ) as HTMLButtonElement;
     const levelElem = elem.querySelector(".upgrade-level") as HTMLElement;
 
-    // Highlight purchased upgrades and show level
     if (purchasedUpgrade) {
       elem.classList.add("purchased");
       if (levelElem) {
@@ -505,11 +518,8 @@ function updateUpgradeDisplay() {
         levelElem.textContent = "";
       }
     }
-
-    // Disable button if not affordable
-    const currentLevel = purchasedUpgrade?.level || 0;
-    const cost = calculateCost(currentLevel, upgrade!.baseCost, upgrade!.type);
-    upgradeButton.disabled = gameState.currency < cost;
+    console.log(upgrade.cost);
+    upgradeButton.disabled = gameState.currency < upgrade.cost;
   });
 }
 
@@ -549,15 +559,16 @@ function purchaseUpgrade(upgradeId: number) {
 
   if (upgrade.type === "mining") {
     clickPower += upgrade.value;
-    clickPowerDisplay.textContent = new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-    }).format(clickPower);
+    clickPowerDisplay.textContent = formatDollar(clickPower, 1000);
     prerenderToastText();
   }
 }
 
-function formatDollar(num: number, threshold: number): string {
+function formatDollar(
+  num: number,
+  threshold: number,
+  decimals: number = 2,
+): string {
   const suffixes = [
     "",
     "k",
@@ -582,9 +593,12 @@ function formatDollar(num: number, threshold: number): string {
     num /= 1000;
     suffixIndex++;
   }
-  return `$${sign < 0 ? "-" : ""}${num.toFixed(1).replace(/\.0$/, "")}${
-    suffixes[suffixIndex]
-  }`;
+  return `$${sign < 0 ? "-" : ""}${
+    num.toFixed(Math.min(Math.max(suffixIndex, 2), decimals)).replace(
+      /\.0$/,
+      "",
+    )
+  }${suffixes[suffixIndex]}`;
 }
 
 // Update performance metrics every second
