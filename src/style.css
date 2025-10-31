@@ -1,5 +1,181 @@
-.icon {
-  width: 64px;
-  vertical-align: top;
-  border: 1px solid salmon;
+body {
+  margin: 0;
+  padding: 0% 10% 10% 10%;
+  font-family: Arial, sans-serif;
+  background-color: #f0f0f0;
+}
+
+h1 {
+  font-size: 2em;
+  margin-bottom: 0.25em;
+}
+
+h2 {
+  font-size: 1.25em;
+  color: #484848;
+  margin: 0 0 0.25em 0;
+}
+
+button {
+  font-family: inherit;
+  background: #fff955;
+  cursor: pointer;
+  padding: 0.125em;
+  border: black 2px solid;
+  border-radius: 0.125em;
+  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
+  transition: transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+button:active {
+  transform: scale(0.92);
+}
+
+button:hover:not(:active) {
+  transform: scale(1.01);
+}
+
+#ui-container {
+  position: relative;
+  display: grid;
+  grid-template-columns: 200px auto 200px;
+  top: 10svh;
+  left: 0;
+  width: 80%;
+  height: 80%;
+}
+
+#income-box {
+  position: relative;
+  top: 10svh;
+  left: 5%;
+  background-color: white;
+  padding: 0px 10px 20px 15px;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  width: 200px;
+}
+
+#income-box p {
+  margin: 0 0 0 1ch;
+  font-size: 1.125em;
+  color: #333;
+}
+
+#income-box > div {
+  display: flex;
+  justify-content: start;
+  margin-bottom: 0.5em;
+}
+
+#upgrades-box {
+  position: relative;
+  top: 10svh;
+  right: 0.5vw;
+  background-color: white;
+  padding: 0px 10px 20px 15px;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  width: 200px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+#upgrades-box ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+#upgrade-tabs {
+  display: flex;
+  justify-content: start;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+#upgrade-tabs button {
+  background: #fff955;
+  border: none;
+  font-size: 1em;
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 5px;
+}
+
+.upgrade-button {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 1em;
+  border-radius: 0.5em;
+}
+
+.upgrade-button:disabled {
+  background: #cccccc;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.upgrade-button:disabled:hover {
+  transform: none;
+}
+
+.upgrade-info {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  justify-content: space-evenly;
+  grid-template-columns: 2fr 1fr;
+  overflow: hidden;
+  text-wrap: nowrap;
+  align-items: center;
+}
+
+.upgrade-level {
+  font-size: 1.5em;
+  color: #666;
+  text-align: right;
+  padding-right: 0.5ch;
+}
+
+#upgrade-tooltip {
+  display: none;
+  position: absolute;
+  background: whitesmoke;
+  border: black 2px solid;
+  border-radius: 0.125em;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  padding: 10px;
+  z-index: 10;
+  width: max-content;
+  max-width: 200px;
+  font-size: 0.875em;
+  color: #333;
+  pointer-events: none;
+  transition: opacity 0.2s ease-in-out;
+}
+
+#game-canvas {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100vw;
+  z-index: -1;
+}
+
+#main-clicker {
+  background: #fff955;
+  font-size: 3vw;
+  cursor: pointer;
+  position: fixed;
+  padding: 0.125em;
+  left: 10%;
+  bottom: 25%;
+  border: black 2px solid;
+  border-radius: 0.125em;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
