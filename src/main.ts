@@ -34,7 +34,6 @@ type Upgrade = {
   type: string;
   baseCost: number;
   value: number;
-  get cost(): number;
 };
 
 type PurchasedUpgrade = Upgrade & {
@@ -105,27 +104,6 @@ const upgradeList = document.getElementById(
 const upgradeData: Upgrade[] = await fetch("data/upgrades.json")
   .then((res) => res.json())
   .then((data) => data as Upgrade[]);
-upgradeData.forEach((upgrade: Upgrade) => {
-  Object.defineProperty(
-    upgrade,
-    "cost",
-    upgrade.type === "mining"
-      ? {
-        get() {
-          return 10 ** this.level * this.baseCost;
-        },
-        enumerable: true,
-        configurable: true,
-      }
-      : {
-        get() {
-          return 1.15 ** this.level * this.baseCost;
-        },
-        enumerable: true,
-        configurable: true,
-      },
-  );
-});
 //#endregion
 
 mainClicker.addEventListener("click", () => pendingClicks++);
@@ -518,8 +496,10 @@ function updateUpgradeDisplay() {
         levelElem.textContent = "";
       }
     }
-    console.log(upgrade.cost);
-    upgradeButton.disabled = gameState.currency < upgrade.cost;
+
+    const level = purchasedUpgrade?.level || 0;
+    upgradeButton.disabled =
+      gameState.currency < calculateCost(level, upgrade.baseCost, upgrade.type);
   });
 }
 
