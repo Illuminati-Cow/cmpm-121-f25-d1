@@ -100,27 +100,37 @@ const upgradeList = document.getElementById(
 ) as HTMLOListElement;
 //#endregion
 
-//#region Load Data
-const upgradeData: Upgrade[] = await fetch("data/upgrades.json")
-  .then((res) => res.json())
-  .then((data) => data as Upgrade[]);
-//#endregion
-
-mainClicker.addEventListener("click", () => pendingClicks++);
-
 const gameState: GameState = {
   currency: 0,
   upgrades: [],
 };
 
-loadUpgrades();
+//#region Load Data
+const upgradeData: Upgrade[] = await fetch("data/upgrades.json")
+  .then((res) => res.json())
+  .then((data) => data as Upgrade[]);
+upgradeList.innerHTML = "";
+upgradeData.forEach((upgrade) => {
+  upgradeList.appendChild(createUpgradeElement(upgrade));
+});
+//#endregion
 
-function loadUpgrades() {
-  upgradeList.innerHTML = "";
-  upgradeData.forEach((upgrade) => {
-    upgradeList.appendChild(createUpgradeElement(upgrade));
-  });
-}
+mainClicker.addEventListener("click", () => pendingClicks++);
+
+document.addEventListener("upgradePurchased", (e) => {
+  const detail = (e as CustomEvent<UpgradePurchasedEventDetail>).detail;
+  updateUpgradeCost(detail.upgrade.id);
+  switch (detail.upgrade.type) {
+    case "construction":
+      updatePassiveIncome();
+      break;
+    case "mining":
+      clickPower += detail.upgrade.value;
+      clickPowerDisplay.textContent = formatDollar(clickPower, 1000);
+      prerenderToastText();
+      break;
+  }
+});
 
 function createUpgradeElement(upgrade: Upgrade): HTMLLIElement {
   const fragment = document.importNode(
@@ -146,19 +156,16 @@ function createUpgradeElement(upgrade: Upgrade): HTMLLIElement {
 
   const tooltip = document.getElementById("upgrade-tooltip")!;
   let tooltipUpdateHandler: (() => void) | null = null;
+
   upgradeButton.addEventListener("mouseover", () => {
     updateTooltipContent(upgrade);
-    tooltip.style.display = "block";
-    const tooltipRect = tooltip.getBoundingClientRect();
-    const rect = upgradeButton.getBoundingClientRect();
-    tooltip.style.top = `${rect.top}px`;
-    tooltip.style.left = `${rect.left - tooltipRect.width - 10}px`;
-    tooltip.style.opacity = "1";
+    openTooltip();
     tooltipUpdateHandler = () => updateTooltipContent(upgrade);
     document.addEventListener("upgradePurchased", tooltipUpdateHandler);
   });
+
   upgradeButton.addEventListener("mouseout", () => {
-    tooltip.style.opacity = "0";
+    closeTooltip();
     if (tooltipUpdateHandler) {
       document.removeEventListener("upgradePurchased", tooltipUpdateHandler);
       tooltipUpdateHandler = null;
@@ -166,6 +173,19 @@ function createUpgradeElement(upgrade: Upgrade): HTMLLIElement {
   });
 
   return listItem;
+
+  function openTooltip() {
+    tooltip.style.display = "block";
+    const tooltipRect = tooltip.getBoundingClientRect();
+    const rect = upgradeButton.getBoundingClientRect();
+    tooltip.style.top = `${rect.top}px`;
+    tooltip.style.left = `${rect.left - tooltipRect.width - 10}px`;
+    tooltip.style.opacity = "1";
+  }
+
+  function closeTooltip() {
+    tooltip.style.opacity = "0";
+  }
 }
 
 function updateTooltipContent(upgrade: Upgrade) {
@@ -512,13 +532,13 @@ function updatePerformanceMetrics() {
 function purchaseUpgrade(upgradeId: number) {
   const upgrade = upgradeData.find((u) => u.id === upgradeId);
   if (!upgrade) return;
-  let purchasedUpgrade = gameState.upgrades.find((u) => u.id === upgradeId);
-  const currentLevel = purchasedUpgrade?.level || 0;
+  const purchasedUpgrade = gameState.upgrades.find((u) => u.id === upgradeId) ??
+    { ...upgrade, level: 0 };
+  const currentLevel = purchasedUpgrade.level;
   const cost = calculateCost(currentLevel, upgrade.baseCost, upgrade.type);
   if (gameState.currency < cost) return;
 
-  if (!purchasedUpgrade) {
-    purchasedUpgrade = { ...upgrade, level: 0 };
+  if (purchasedUpgrade.level === 0) {
     gameState.upgrades.push(purchasedUpgrade);
   }
 
@@ -531,21 +551,6 @@ function purchaseUpgrade(upgradeId: number) {
     }),
   );
 }
-
-document.addEventListener("upgradePurchased", (e) => {
-  const detail = (e as CustomEvent<UpgradePurchasedEventDetail>).detail;
-  updateUpgradeCost(detail.upgrade.id);
-  switch (detail.upgrade.type) {
-    case "construction":
-      updatePassiveIncome();
-      break;
-    case "mining":
-      clickPower += detail.upgrade.value;
-      clickPowerDisplay.textContent = formatDollar(clickPower, 1000);
-      prerenderToastText();
-      break;
-  }
-});
 
 function formatDollar(
   num: number,
