@@ -41,7 +41,7 @@ type PurchasedUpgrade = Upgrade & {
 };
 
 interface UpgradePurchasedEventDetail {
-  upgradeId: number;
+  upgrade: PurchasedUpgrade;
 }
 
 const clickSound = new Audio("click.wav");
@@ -509,40 +509,43 @@ function updatePerformanceMetrics() {
   performanceMetrics!.textContent = `${fps} FPS | ${msPerFrame} ms/frame`;
 }
 
-// TODO: Buffer the upgrade purchases so they are processed in the main game loop
 function purchaseUpgrade(upgradeId: number) {
   const upgrade = upgradeData.find((u) => u.id === upgradeId);
   if (!upgrade) return;
-  const purchasedUpgrade = gameState.upgrades.find((u) => u.id === upgradeId);
+  let purchasedUpgrade = gameState.upgrades.find((u) => u.id === upgradeId);
   const currentLevel = purchasedUpgrade?.level || 0;
   const cost = calculateCost(currentLevel, upgrade.baseCost, upgrade.type);
   if (gameState.currency < cost) return;
 
-  gameState.currency -= cost;
-  if (purchasedUpgrade) {
-    purchasedUpgrade.level += 1;
-  } else {
-    gameState.upgrades.push({ ...upgrade, level: 1 });
+  if (!purchasedUpgrade) {
+    purchasedUpgrade = { ...upgrade, level: 0 };
+    gameState.upgrades.push(purchasedUpgrade);
   }
+
+  gameState.currency -= cost;
+  purchasedUpgrade.level += 1;
 
   document.dispatchEvent(
     new CustomEvent<UpgradePurchasedEventDetail>("upgradePurchased", {
-      detail: { upgradeId },
+      detail: { upgrade: purchasedUpgrade },
     }),
   );
-
-  updateUpgradeCost(upgradeId);
-
-  if (upgrade.type === "construction") {
-    updatePassiveIncome();
-  }
-
-  if (upgrade.type === "mining") {
-    clickPower += upgrade.value;
-    clickPowerDisplay.textContent = formatDollar(clickPower, 1000);
-    prerenderToastText();
-  }
 }
+
+document.addEventListener("upgradePurchased", (e) => {
+  const detail = (e as CustomEvent<UpgradePurchasedEventDetail>).detail;
+  updateUpgradeCost(detail.upgrade.id);
+  switch (detail.upgrade.type) {
+    case "construction":
+      updatePassiveIncome();
+      break;
+    case "mining":
+      clickPower += detail.upgrade.value;
+      clickPowerDisplay.textContent = formatDollar(clickPower, 1000);
+      prerenderToastText();
+      break;
+  }
+});
 
 function formatDollar(
   num: number,
