@@ -37,6 +37,11 @@ type Upgrade = {
   value: number;
 };
 
+const UpgradeType = {
+  PASSIVE: "passive",
+  CLICK: "click",
+};
+
 type PurchasedUpgrade = Upgrade & {
   level: number;
 };
@@ -122,10 +127,10 @@ document.addEventListener("upgrade-purchased", (e) => {
   const detail = (e as CustomEvent<UpgradePurchasedEventDetail>).detail;
   updateUpgradeCost(detail.upgrade.id);
   switch (detail.upgrade.type) {
-    case "construction":
+    case UpgradeType.PASSIVE:
       updatePassiveIncome();
       break;
-    case "mining":
+    case UpgradeType.CLICK:
       clickPower += detail.upgrade.value;
       clickPowerDisplay.textContent = formatDollar(clickPower, 1000);
       break;
@@ -210,7 +215,7 @@ function updateTooltipContent(upgrade: Upgrade) {
       1000,
     )
   }`;
-  const suffix = upgrade.type === "mining" ? "c" : "s";
+  const suffix = upgrade.type === UpgradeType.CLICK ? "c" : "s";
   tooltipLevel.textContent = `Level: ${getUpgradeLevel(upgrade.id)}`;
   tooltipValue.textContent = `Value: +${
     formatDollar(upgrade.value, 1000)
@@ -242,7 +247,7 @@ function updateUpgradeCost(upgradeId: number) {
 function updatePassiveIncome() {
   let income = 0;
   gameState.upgrades.forEach((upgrade) => {
-    if (upgrade.type === "construction") {
+    if (upgrade.type === UpgradeType.PASSIVE) {
       income += upgrade.level * upgrade.value;
     }
   });
@@ -250,7 +255,7 @@ function updatePassiveIncome() {
 }
 
 function calculateCost(level: number, baseCost: number, type: string): number {
-  return (type === "mining" ? 10 : 1.15) ** level * baseCost;
+  return (type === UpgradeType.CLICK ? 10 : 1.15) ** level * baseCost;
 }
 
 function calculateClickValue(): number {
@@ -298,7 +303,7 @@ function consumeClicks(clicks: number) {
 
 function tickUpgrades(_delta: number) {
   gameState.upgrades.forEach((upgrade) => {
-    if (upgrade.type === "construction") {
+    if (upgrade.type === UpgradeType.PASSIVE) {
       gameState.currency += upgrade.level * upgrade.value * _delta;
     }
   });
