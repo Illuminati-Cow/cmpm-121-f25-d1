@@ -12,6 +12,7 @@ export function drawClickEffects(
   ctx: CanvasRenderingContext2D,
   clickValue: number,
 ) {
+  delta = delta / 1000; // Convert to seconds
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   drawTrucks(clicks, delta, ctx);
   drawClickParticles(clicks, delta, ctx);

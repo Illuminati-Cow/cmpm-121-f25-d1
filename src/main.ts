@@ -8,15 +8,11 @@ declare global {
 
 globalThis.runGameLoop = true;
 globalThis.setMoney = (money: number) => gameState.currency = money;
-let renderDelta: number;
-let lastRenderUpdate: number = performance.now();
-let clickPower = 1;
-
-// Pending clicks to be consumed in logic updates
-let pendingClicks = 0;
 
 const LOGIC_TICK_RATE = 60;
 const LOGIC_TIME_STEP = 1000 / LOGIC_TICK_RATE;
+
+//#region Types
 
 type SerializedGameState = {
   currency: number;
@@ -26,6 +22,7 @@ type SerializedGameState = {
 type GameState = {
   currency: number;
   upgrades: Array<PurchasedUpgrade>;
+  clickPower: number;
 };
 
 type Upgrade = {
@@ -49,6 +46,7 @@ type PurchasedUpgrade = Upgrade & {
 interface UpgradePurchasedEventDetail {
   upgrade: PurchasedUpgrade;
 }
+//#endregion
 
 const clickSound = new Audio("click.wav");
 clickSound.volume = 0.5;
@@ -59,6 +57,7 @@ document.body.appendChild(clickSound);
 const mainClicker = document.getElementById(
   "main-clicker",
 ) as HTMLButtonElement;
+mainClicker.addEventListener("click", () => pendingClicks++);
 const currencyDisplay = document.getElementById(
   "currency-display",
 ) as HTMLParagraphElement;
@@ -106,12 +105,14 @@ const upgradeList = document.getElementById(
 ) as HTMLOListElement;
 //#endregion
 
+//#region Game State
 const gameState: GameState = {
   currency: 0,
+  clickPower: 1,
   upgrades: [],
 };
+let pendingClicks = 0;
 
-//#region Load Data
 const upgradeData: Upgrade[] = await fetch("data/upgrades.json")
   .then((res) => res.json())
   .then((data) => data as Upgrade[]);
@@ -121,21 +122,51 @@ upgradeData.forEach((upgrade) => {
 });
 //#endregion
 
-mainClicker.addEventListener("click", () => pendingClicks++);
-
+//#region Upgrade System
 document.addEventListener("upgrade-purchased", (e) => {
   const detail = (e as CustomEvent<UpgradePurchasedEventDetail>).detail;
   updateUpgradeCost(detail.upgrade.id);
   switch (detail.upgrade.type) {
     case UpgradeType.PASSIVE:
-      updatePassiveIncome();
+      updatePassiveIncomeDisplay();
       break;
     case UpgradeType.CLICK:
-      clickPower += detail.upgrade.value;
-      clickPowerDisplay.textContent = formatDollar(clickPower, 1000);
+      gameState.clickPower += detail.upgrade.value;
+      clickPowerDisplay.textContent = formatDollar(gameState.clickPower, 1000);
       break;
   }
 });
+
+function tickUpgrades(_delta: number) {
+  gameState.upgrades.forEach((upgrade) => {
+    if (upgrade.type === UpgradeType.PASSIVE) {
+      gameState.currency += upgrade.level * upgrade.value * _delta;
+    }
+  });
+}
+
+function purchaseUpgrade(upgradeId: number) {
+  const upgrade = upgradeData.find((u) => u.id === upgradeId);
+  if (!upgrade) return;
+  const purchasedUpgrade = gameState.upgrades.find((u) => u.id === upgradeId) ??
+    { ...upgrade, level: 0 };
+  const currentLevel = purchasedUpgrade.level;
+  const cost = calculateCost(currentLevel, upgrade.baseCost, upgrade.type);
+  if (gameState.currency < cost) return;
+
+  if (purchasedUpgrade.level === 0) {
+    gameState.upgrades.push(purchasedUpgrade);
+  }
+
+  gameState.currency -= cost;
+  purchasedUpgrade.level += 1;
+
+  document.dispatchEvent(
+    new CustomEvent<UpgradePurchasedEventDetail>("upgrade-purchased", {
+      detail: { upgrade: purchasedUpgrade },
+    }),
+  );
+}
 
 function createUpgradeElement(upgrade: Upgrade): HTMLLIElement {
   const fragment = document.importNode(
@@ -163,9 +194,9 @@ function createUpgradeElement(upgrade: Upgrade): HTMLLIElement {
   let tooltipUpdateHandler: (() => void) | null = null;
 
   upgradeButton.addEventListener("mouseover", () => {
-    updateTooltipContent(upgrade);
+    updateUpgradeTooltipContent(upgrade);
     openTooltip();
-    tooltipUpdateHandler = () => updateTooltipContent(upgrade);
+    tooltipUpdateHandler = () => updateUpgradeTooltipContent(upgrade);
     document.addEventListener("upgrade-purchased", tooltipUpdateHandler);
   });
 
@@ -193,7 +224,62 @@ function createUpgradeElement(upgrade: Upgrade): HTMLLIElement {
   }
 }
 
-function updateTooltipContent(upgrade: Upgrade) {
+function updateUpgradeCost(upgradeId: number) {
+  const upgrade = upgradeData.find((u) => u.id === upgradeId);
+  if (!upgrade) return;
+  const currentLevel =
+    gameState.upgrades.find((u) => u.id === upgradeId)?.level || 0;
+  const newCost = calculateCost(currentLevel, upgrade.baseCost, upgrade.type);
+
+  const upgradeElements = upgradeList.querySelectorAll("li");
+  upgradeElements.forEach((elem) => {
+    const costElem = elem.querySelector(".upgrade-cost");
+    if (costElem && elem.dataset.upgradeId === upgradeId.toString()) {
+      costElem.textContent = formatDollar(newCost, 1000, 3);
+    }
+  });
+}
+
+function updatePassiveIncomeDisplay() {
+  let income = 0;
+  gameState.upgrades.forEach((upgrade) => {
+    if (upgrade.type === UpgradeType.PASSIVE) {
+      income += upgrade.level * upgrade.value;
+    }
+  });
+  incomeDisplay.textContent = formatDollar(income, 1000);
+}
+
+function updateUpgradeDisplay() {
+  const upgradeElements = upgradeList.querySelectorAll("li");
+  upgradeElements.forEach((elem) => {
+    const upgradeId = Number(elem.dataset.upgradeId);
+    const upgrade = upgradeData.find((u) => u.id === upgradeId)!;
+    const purchasedUpgrade = gameState.upgrades.find((u) => u.id === upgradeId);
+    const upgradeButton = elem.querySelector(
+      ".upgrade-button",
+    ) as HTMLButtonElement;
+    const levelElem = elem.querySelector(".upgrade-level") as HTMLElement;
+
+    if (purchasedUpgrade) {
+      elem.classList.add("purchased");
+      if (levelElem) {
+        levelElem.textContent = `${purchasedUpgrade.level}`;
+      }
+    } else {
+      elem.classList.remove("purchased");
+      if (levelElem) {
+        levelElem.textContent = "";
+      }
+    }
+
+    const level = purchasedUpgrade?.level || 0;
+    upgradeButton.disabled =
+      gameState.currency < calculateCost(level, upgrade.baseCost, upgrade.type);
+  });
+}
+
+function updateUpgradeTooltipContent(upgrade: Upgrade) {
   const tooltip = document.getElementById("upgrade-tooltip")!;
   const tooltipDescription = tooltip.querySelector(
     ".upgrade-tooltip-description",
@@ -228,72 +314,18 @@ function updateTooltipContent(upgrade: Upgrade) {
   }/${suffix}`;
 }
 
-function updateUpgradeCost(upgradeId: number) {
-  const upgrade = upgradeData.find((u) => u.id === upgradeId);
-  if (!upgrade) return;
-  const currentLevel =
-    gameState.upgrades.find((u) => u.id === upgradeId)?.level || 0;
-  const newCost = calculateCost(currentLevel, upgrade.baseCost, upgrade.type);
-
-  const upgradeElements = upgradeList.querySelectorAll("li");
-  upgradeElements.forEach((elem) => {
-    const costElem = elem.querySelector(".upgrade-cost");
-    if (costElem && elem.dataset.upgradeId === upgradeId.toString()) {
-      costElem.textContent = formatDollar(newCost, 1000, 3);
-    }
-  });
+function getUpgradeLevel(upgradeId: number): number {
+  const upgrade = gameState.upgrades.find((u) => u.id === upgradeId);
+  return upgrade ? upgrade.level : 0;
 }
-
-function updatePassiveIncome() {
-  let income = 0;
-  gameState.upgrades.forEach((upgrade) => {
-    if (upgrade.type === UpgradeType.PASSIVE) {
-      income += upgrade.level * upgrade.value;
-    }
-  });
-  incomeDisplay.textContent = formatDollar(income, 1000);
-}
+//#endregion
 
 function calculateCost(level: number, baseCost: number, type: string): number {
   return (type === UpgradeType.CLICK ? 10 : 1.15) ** level * baseCost;
 }
 
 function calculateClickValue(): number {
-  return clickPower;
-}
-
-function getUpgradeLevel(upgradeId: number): number {
-  const upgrade = gameState.upgrades.find((u) => u.id === upgradeId);
-  return upgrade ? upgrade.level : 0;
-}
-
-let lastTick = performance.now();
-let clicksThisSecond = 0;
-let clicksToRender = 0;
-
-function logicUpdate() {
-  const delta = (performance.now() - lastTick) / 1000;
-  lastTick = performance.now();
-  consumeClicks(pendingClicks);
-  clicksThisSecond += pendingClicks;
-  clicksToRender = pendingClicks;
-  pendingClicks = 0;
-  tickUpgrades(delta);
-}
-
-function enterRenderLoop() {
-  renderDelta = performance.now() - lastRenderUpdate;
-  lastRenderUpdate = performance.now();
-  updateStatsDisplay();
-  updateUpgradeDisplay();
-  drawClickEffects(
-    clicksToRender,
-    renderDelta / 1000,
-    canvas.getContext("2d")!,
-    calculateClickValue(),
-  );
-  clicksToRender = 0;
-  requestAnimationFrame(enterRenderLoop);
+  return gameState.clickPower;
 }
 
 function consumeClicks(clicks: number) {
@@ -301,17 +333,9 @@ function consumeClicks(clicks: number) {
   clicks > 0 && clickSound.play();
 }
 
-function tickUpgrades(_delta: number) {
-  gameState.upgrades.forEach((upgrade) => {
-    if (upgrade.type === UpgradeType.PASSIVE) {
-      gameState.currency += upgrade.level * upgrade.value * _delta;
-    }
-  });
-}
-
 let displayedCurrency = 0;
 const currencyAnimationSpeed = 10;
-function updateStatsDisplay() {
+function updateCurrencyDisplay(renderDelta: number) {
   // Animate the displayed currency towards the actual currency
   const diff = gameState.currency - displayedCurrency;
   if (renderDelta > 1000) {
@@ -327,64 +351,6 @@ function updateStatsDisplay() {
   }
   currencyDisplay.title = `$${gameState.currency.toFixed(2)}`;
   currencyDisplay!.textContent = formatDollar(displayedCurrency, 10_000);
-}
-
-function updateUpgradeDisplay() {
-  const upgradeElements = upgradeList.querySelectorAll("li");
-  upgradeElements.forEach((elem) => {
-    const upgradeId = Number(elem.dataset.upgradeId);
-    const upgrade = upgradeData.find((u) => u.id === upgradeId)!;
-    const purchasedUpgrade = gameState.upgrades.find((u) => u.id === upgradeId);
-    const upgradeButton = elem.querySelector(
-      ".upgrade-button",
-    ) as HTMLButtonElement;
-    const levelElem = elem.querySelector(".upgrade-level") as HTMLElement;
-
-    if (purchasedUpgrade) {
-      elem.classList.add("purchased");
-      if (levelElem) {
-        levelElem.textContent = `${purchasedUpgrade.level}`;
-      }
-    } else {
-      elem.classList.remove("purchased");
-      if (levelElem) {
-        levelElem.textContent = "";
-      }
-    }
-
-    const level = purchasedUpgrade?.level || 0;
-    upgradeButton.disabled =
-      gameState.currency < calculateCost(level, upgrade.baseCost, upgrade.type);
-  });
-}
-
-function updatePerformanceMetrics() {
-  const fps = (1000 / renderDelta).toFixed(1);
-  const msPerFrame = renderDelta.toFixed(2);
-  performanceMetrics!.textContent = `${fps} FPS | ${msPerFrame} ms/frame`;
-}
-
-function purchaseUpgrade(upgradeId: number) {
-  const upgrade = upgradeData.find((u) => u.id === upgradeId);
-  if (!upgrade) return;
-  const purchasedUpgrade = gameState.upgrades.find((u) => u.id === upgradeId) ??
-    { ...upgrade, level: 0 };
-  const currentLevel = purchasedUpgrade.level;
-  const cost = calculateCost(currentLevel, upgrade.baseCost, upgrade.type);
-  if (gameState.currency < cost) return;
-
-  if (purchasedUpgrade.level === 0) {
-    gameState.upgrades.push(purchasedUpgrade);
-  }
-
-  gameState.currency -= cost;
-  purchasedUpgrade.level += 1;
-
-  document.dispatchEvent(
-    new CustomEvent<UpgradePurchasedEventDetail>("upgrade-purchased", {
-      detail: { upgrade: purchasedUpgrade },
-    }),
-  );
 }
 
 function formatDollar(
@@ -424,11 +390,51 @@ function formatDollar(
   }${suffixes[suffixIndex]}`;
 }
 
+//#region Game Loops
+
+let lastTick = performance.now();
+let clicksThisSecond = 0;
+let clicksToRender = 0;
+
+function logicUpdate() {
+  const delta = (performance.now() - lastTick) / 1000;
+  lastTick = performance.now();
+  consumeClicks(pendingClicks);
+  clicksThisSecond += pendingClicks;
+  clicksToRender = pendingClicks;
+  pendingClicks = 0;
+  tickUpgrades(delta);
+}
+
+let renderDelta: number;
+let lastRenderUpdate: number = performance.now();
+
+function enterRenderLoop() {
+  renderDelta = performance.now() - lastRenderUpdate;
+  lastRenderUpdate = performance.now();
+  updateCurrencyDisplay(renderDelta);
+  updateUpgradeDisplay();
+  drawClickEffects(
+    clicksToRender,
+    renderDelta,
+    canvas.getContext("2d")!,
+    calculateClickValue(),
+  );
+  clicksToRender = 0;
+  requestAnimationFrame(enterRenderLoop);
+}
+
 // Update performance metrics every second
-setInterval(updatePerformanceMetrics, 1000);
+setInterval(() => {
+  const fps = (1000 / renderDelta).toFixed(1);
+  const msPerFrame = renderDelta.toFixed(2);
+  performanceMetrics!.textContent = `${fps} FPS | ${msPerFrame} ms/frame`;
+}, 1000);
 setInterval(() => {
   document.title = `NuclearClick - $${gameState.currency.toFixed(2)}`;
 }, 2000);
+
+// Update click income display every second based on clicks this second
 setInterval(() => {
   clickIncomeDisplay.textContent = `+${
     calculateClickValue() * clicksThisSecond
@@ -439,3 +445,5 @@ setInterval(() => {
 // Start loops
 setInterval(logicUpdate, LOGIC_TIME_STEP);
 enterRenderLoop();
+
+//#endregion
