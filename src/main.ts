@@ -1,5 +1,6 @@
 import { drawClickEffects } from "./effects.ts";
 import "./style.css";
+import { Upgrade, upgradeData, UpgradeType } from "./upgrades.ts";
 
 declare global {
   var runGameLoop: boolean;
@@ -23,20 +24,7 @@ type GameState = {
   currency: number;
   upgrades: Array<PurchasedUpgrade>;
   clickPower: number;
-};
-
-type Upgrade = {
-  id: number;
-  name: string;
-  description: string;
-  type: string;
-  baseCost: number;
-  value: number;
-};
-
-const UpgradeType = {
-  PASSIVE: "passive",
-  CLICK: "click",
+  lastPassiveIncome: number;
 };
 
 type PurchasedUpgrade = Upgrade & {
@@ -46,6 +34,7 @@ type PurchasedUpgrade = Upgrade & {
 interface UpgradePurchasedEventDetail {
   upgrade: PurchasedUpgrade;
 }
+
 //#endregion
 
 const clickSound = new Audio("click.wav");
@@ -110,12 +99,10 @@ const gameState: GameState = {
   currency: 0,
   clickPower: 1,
   upgrades: [],
+  lastPassiveIncome: 0,
 };
 let pendingClicks = 0;
 
-const upgradeData: Upgrade[] = await fetch("data/upgrades.json")
-  .then((res) => res.json())
-  .then((data) => data as Upgrade[]);
 upgradeList.innerHTML = "";
 upgradeData.forEach((upgrade) => {
   upgradeList.appendChild(createUpgradeElement(upgrade));
@@ -131,7 +118,7 @@ document.addEventListener("upgrade-purchased", (e) => {
       updatePassiveIncomeDisplay();
       break;
     case UpgradeType.CLICK:
-      gameState.clickPower += detail.upgrade.value;
+      gameState.clickPower += detail.upgrade.baseValue;
       clickPowerDisplay.textContent = formatDollar(gameState.clickPower, 1000);
       break;
   }
@@ -140,7 +127,7 @@ document.addEventListener("upgrade-purchased", (e) => {
 function tickUpgrades(_delta: number) {
   gameState.upgrades.forEach((upgrade) => {
     if (upgrade.type === UpgradeType.PASSIVE) {
-      gameState.currency += upgrade.level * upgrade.value * _delta;
+      gameState.currency += upgrade.level * upgrade.baseValue * _delta;
     }
   });
 }
@@ -244,7 +231,7 @@ function updatePassiveIncomeDisplay() {
   let income = 0;
   gameState.upgrades.forEach((upgrade) => {
     if (upgrade.type === UpgradeType.PASSIVE) {
-      income += upgrade.level * upgrade.value;
+      income += upgrade.level * upgrade.baseValue;
     }
   });
   incomeDisplay.textContent = formatDollar(income, 1000);
@@ -304,11 +291,11 @@ function updateUpgradeTooltipContent(upgrade: Upgrade) {
   const suffix = upgrade.type === UpgradeType.CLICK ? "c" : "s";
   tooltipLevel.textContent = `Level: ${getUpgradeLevel(upgrade.id)}`;
   tooltipValue.textContent = `Value: +${
-    formatDollar(upgrade.value, 1000)
+    formatDollar(upgrade.baseValue, 1000)
   }/${suffix}`;
   const totalValue =
     (gameState.upgrades.find((u) => u.id === upgrade.id)?.level || 0) *
-    upgrade.value;
+    upgrade.baseValue;
   tooltipTotalValue.textContent = `Total Value: +${
     formatDollar(totalValue, 1000)
   }/${suffix}`;
@@ -321,7 +308,7 @@ function getUpgradeLevel(upgradeId: number): number {
 //#endregion
 
 function calculateCost(level: number, baseCost: number, type: string): number {
-  return (type === UpgradeType.CLICK ? 10 : 1.15) ** level * baseCost;
+  return (type === UpgradeType.CLICK ? 3 : 1.15) ** level * baseCost;
 }
 
 function calculateClickValue(): number {
