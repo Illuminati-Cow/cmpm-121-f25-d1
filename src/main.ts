@@ -48,6 +48,16 @@ const mainClicker = document.getElementById(
   "main-clicker",
 ) as HTMLButtonElement;
 mainClicker.addEventListener("click", () => pendingClicks++);
+
+const clickerTabButton = document.getElementById(
+  "clicker-tab",
+) as HTMLButtonElement;
+clickerTabButton.addEventListener("click", () => swapUpgradeTabs("click"));
+const passiveTabButton = document.getElementById(
+  "passive-tab",
+) as HTMLButtonElement;
+passiveTabButton.addEventListener("click", () => swapUpgradeTabs("passive"));
+
 const currencyDisplay = document.getElementById(
   "currency-display",
 ) as HTMLParagraphElement;
@@ -60,6 +70,7 @@ const clickPowerDisplay = document.getElementById(
 const incomeDisplay = document.getElementById(
   "income-display",
 ) as HTMLParagraphElement;
+
 const canvas = document.getElementById("game-canvas") as HTMLCanvasElement;
 canvas.width = 800;
 canvas.height = 300;
@@ -106,6 +117,7 @@ upgradeList.innerHTML = "";
 upgradeData.forEach((upgrade) => {
   upgradeList.appendChild(createUpgradeElement(upgrade));
 });
+swapUpgradeTabs("passive");
 //#endregion
 
 //#region Upgrade System
@@ -197,14 +209,15 @@ function createUpgradeElement(upgrade: Upgrade): HTMLLIElement {
   }
 }
 
-function updateUpgrade(upgrade: Upgrade | PurchasedUpgrade) {
+function updateUpgrade(upgrade: PurchasedUpgrade) {
   const upgradeElements = upgradeList.querySelectorAll("li");
   upgradeElements.forEach((elem) => {
     if (elem.dataset.upgradeId !== upgrade.id.toString()) return;
     const costElem = elem.querySelector(".upgrade-cost")!;
     costElem.textContent = formatDollar(upgrade.getCost(), 1000, 3);
     const levelElem = elem.querySelector(".upgrade-level")!;
-    levelElem.textContent = `${(upgrade as PurchasedUpgrade).level ?? 0}`;
+    if (upgrade.level == 0) return;
+    levelElem.textContent = `${upgrade.level ?? 0}`;
   });
 }
 
@@ -263,6 +276,27 @@ function updateUpgradeTooltipContent(upgrade: PurchasedUpgrade) {
   }`;
 }
 
+function swapUpgradeTabs(tab: "click" | "passive") {
+  upgradeList.innerHTML = "";
+  const filteredUpgrades = gameState.upgrades.filter((
+    u,
+  ) => (tab === "click"
+    ? u.type === UpgradeType.CLICK
+    : u.type === UpgradeType.PASSIVE)
+  );
+  filteredUpgrades.forEach((upgrade) => {
+    upgradeList.appendChild(createUpgradeElement(upgrade));
+    updateUpgrade(upgrade);
+  });
+  updateUpgradeDisplay();
+  if (tab === "click") {
+    clickerTabButton.disabled = true;
+    passiveTabButton.disabled = false;
+  } else {
+    clickerTabButton.disabled = false;
+    passiveTabButton.disabled = true;
+  }
+}
 //#endregion
 
 function calculateClickPower(): number {

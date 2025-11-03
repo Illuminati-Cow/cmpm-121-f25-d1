@@ -113,6 +113,13 @@ button:hover:not(:active) {
   border-radius: 5px;
 }
 
+#upgrade-tabs button:disabled {
+  background: #cccccc;
+  cursor: default;
+  box-shadow: none;
+  transform: none;
+}
+
 .upgrade-button {
   width: 100%;
   text-align: left;
