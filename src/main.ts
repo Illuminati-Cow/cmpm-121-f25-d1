@@ -288,7 +288,11 @@ function calculatePassiveIncome(): number {
 
 function consumeClicks(clicks: number) {
   gameState.currency += clicks * calculateClickPower();
-  clicks > 0 && clickSound.play();
+  if (clicks > 0) {
+    clickSound.currentTime = 0;
+    clickSound.play();
+    console.log("Consumed clicks:", clicks);
+  }
 }
 
 let displayedCurrency = 0;
