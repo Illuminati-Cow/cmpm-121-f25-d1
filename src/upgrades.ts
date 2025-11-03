@@ -36,7 +36,7 @@ const percentIncomeUpgradeValue = function (
   this: PurchasedUpgrade,
   context: UpgradeValueContext,
 ): number {
-  return (this.baseValue * (this.level || 0) / 100) * context.income!;
+  return (this.baseValue * (this.level || 0)) * context.income!;
 };
 
 const getClickUpgradeCost = function (
@@ -70,7 +70,7 @@ export const upgradeData: Upgrade[] = [
       "Implements a cooling system to reduce overheating, allowing for more efficient drilling.",
     type: "click",
     baseCost: 2000,
-    baseValue: 10,
+    baseValue: 0.05,
     getValue: percentIncomeUpgradeValue,
     getCost: getClickUpgradeCost,
   },

@@ -17,7 +17,7 @@ export function drawClickEffects(
   drawTrucks(clicks, delta, ctx);
   drawClickParticles(clicks, delta, ctx);
   drawClickToasts(clicks, delta, ctx);
-  if (cachedClickValue !== clickValue) {
+  if (cachedClickValue.toFixed(2) !== clickValue.toFixed(2)) {
     cachedClickValue = clickValue;
     prerenderToastText();
   }

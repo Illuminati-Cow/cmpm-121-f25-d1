@@ -28,8 +28,6 @@ type SerializedGameState = {
 type GameState = {
   currency: number;
   upgrades: Array<PurchasedUpgrade>;
-  clickPower: number;
-  lastPassiveIncome: number;
 };
 
 interface UpgradePurchasedEventDetail {
@@ -98,9 +96,7 @@ const upgradeList = document.getElementById(
 //#region Game State
 const gameState: GameState = {
   currency: 0,
-  clickPower: 1,
-  upgrades: [],
-  lastPassiveIncome: 0,
+  upgrades: upgradeData.map((u) => ({ ...u, level: 0 })),
 };
 let pendingClicks = 0;
 
@@ -113,38 +109,24 @@ upgradeData.forEach((upgrade) => {
 //#region Upgrade System
 document.addEventListener("upgrade-purchased", (e) => {
   const detail = (e as CustomEvent<UpgradePurchasedEventDetail>).detail;
-  updateUpgrade(detail.upgrade.id);
-  switch (detail.upgrade.type) {
-    case UpgradeType.PASSIVE:
-      updatePassiveIncomeDisplay();
-      break;
-    case UpgradeType.CLICK:
-      gameState.clickPower += detail.upgrade.baseValue;
-      clickPowerDisplay.textContent = formatDollar(gameState.clickPower, 1000);
-      break;
-  }
+  updateUpgrade(detail.upgrade);
+  updatePassiveIncomeDisplay();
+  clickPowerDisplay.textContent = formatDollar(calculateClickPower(), 1000);
 });
 
 function tickUpgrades(delta: number) {
-  gameState.upgrades.filter((u) => u.type === UpgradeType.PASSIVE)
-    .forEach(
-      (upgrade) =>
-        gameState.currency += upgrade.getValue({
-          income: gameState.lastPassiveIncome,
-        }) * delta,
-    );
+  const passiveIncome = calculatePassiveIncome();
+  for (const upgrade of gameState.upgrades) {
+    if (upgrade.type !== UpgradeType.PASSIVE) continue;
+    gameState.currency += upgrade.getValue({
+      income: passiveIncome,
+    }) * delta;
+  }
 }
 
 function purchaseUpgrade(upgradeId: number) {
-  const upgrade = upgradeData.find((u) => u.id === upgradeId);
-  if (!upgrade) return;
-  const purchasedUpgrade = gameState.upgrades.find((u) => u.id === upgradeId) ??
-    { ...upgrade, level: 0 };
+  const purchasedUpgrade = gameState.upgrades.find((u) => u.id === upgradeId)!;
   if (gameState.currency < purchasedUpgrade.getCost()) return;
-
-  if (purchasedUpgrade.level === 0) {
-    gameState.upgrades.push(purchasedUpgrade);
-  }
 
   gameState.currency -= purchasedUpgrade.getCost();
   purchasedUpgrade.level += 1;
@@ -211,15 +193,10 @@ function createUpgradeElement(upgrade: Upgrade): HTMLLIElement {
   }
 }
 
-function updateUpgrade(upgradeId: number) {
-  let upgrade = upgradeData.find((u) => u.id === upgradeId);
-  if (!upgrade) return;
-  upgrade = gameState.upgrades.find((u) => u.id === upgradeId) ?? upgrade;
+function updateUpgrade(upgrade: Upgrade | PurchasedUpgrade) {
   const upgradeElements = upgradeList.querySelectorAll("li");
   upgradeElements.forEach((elem) => {
-    if (
-      !elem.dataset.upgradeId || elem.dataset.upgradeId !== upgradeId.toString()
-    ) return;
+    if (elem.dataset.upgradeId !== upgrade.id.toString()) return;
     const costElem = elem.querySelector(".upgrade-cost")!;
     costElem.textContent = formatDollar(upgrade.getCost(), 1000, 3);
     const levelElem = elem.querySelector(".upgrade-level")!;
@@ -231,7 +208,7 @@ function updatePassiveIncomeDisplay() {
   let income = 0;
   gameState.upgrades.forEach((upgrade) => {
     if (upgrade.type === UpgradeType.PASSIVE) {
-      income += upgrade.level * upgrade.baseValue;
+      income += upgrade.getValue({ income: calculatePassiveIncome() });
     }
   });
   incomeDisplay.textContent = formatDollar(income, 1000);
@@ -246,11 +223,6 @@ function updateUpgradeDisplay() {
     const upgradeButton = elem.querySelector(
       ".upgrade-button",
     ) as HTMLButtonElement;
-
-    if (purchasedUpgrade) {
-      elem.classList.add("purchased");
-    }
-
     upgradeButton.disabled =
       gameState.currency < (purchasedUpgrade?.getCost() ?? upgrade.getCost());
   });
@@ -279,22 +251,43 @@ function updateUpgradeTooltipContent(upgrade: PurchasedUpgrade) {
   tooltipValue.textContent = `Value: +${
     formatDollar(upgrade.baseValue, 1000)
   }/${suffix}`;
-  const totalValue =
-    (gameState.upgrades.find((u) => u.id === upgrade.id)?.level || 0) *
-    upgrade.baseValue;
   tooltipTotalValue.textContent = `Total Value: +${
-    formatDollar(totalValue, 1000)
+    formatDollar(
+      upgrade.getValue({
+        income: calculatePassiveIncome(),
+        clickPower: calculateClickPower(),
+      }),
+      1000,
+    )
   }/${suffix}`;
 }
 
 //#endregion
 
-function calculateClickValue(): number {
-  return gameState.clickPower;
+function calculateClickPower(): number {
+  let clickPower = 1;
+  const passiveIncome = calculatePassiveIncome();
+  for (const upgrade of gameState.upgrades) {
+    if (upgrade.type !== UpgradeType.CLICK) continue;
+    clickPower += upgrade.getValue({
+      income: passiveIncome,
+      clickPower,
+    });
+  }
+  return clickPower;
+}
+
+function calculatePassiveIncome(): number {
+  let income = 0;
+  for (const upgrade of gameState.upgrades) {
+    if (upgrade.type !== UpgradeType.PASSIVE) continue;
+    income += upgrade.getValue({});
+  }
+  return income;
 }
 
 function consumeClicks(clicks: number) {
-  gameState.currency += clicks * calculateClickValue();
+  gameState.currency += clicks * calculateClickPower();
   clicks > 0 && clickSound.play();
 }
 
@@ -383,7 +376,7 @@ function enterRenderLoop() {
     clicksToRender,
     renderDelta,
     canvas.getContext("2d")!,
-    calculateClickValue(),
+    calculateClickPower(),
   );
   clicksToRender = 0;
   requestAnimationFrame(enterRenderLoop);
@@ -402,7 +395,11 @@ setInterval(() => {
 // Update click income display every second based on clicks this second
 setInterval(() => {
   clickIncomeDisplay.textContent = `+${
-    calculateClickValue() * clicksThisSecond
+    formatDollar(
+      calculateClickPower() * clicksThisSecond,
+      1000,
+      0,
+    )
   }`;
   clicksThisSecond = 0;
 }, 1000);
