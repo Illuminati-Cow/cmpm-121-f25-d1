@@ -113,7 +113,7 @@ upgradeData.forEach((upgrade) => {
 //#region Upgrade System
 document.addEventListener("upgrade-purchased", (e) => {
   const detail = (e as CustomEvent<UpgradePurchasedEventDetail>).detail;
-  updateUpgradeCost(detail.upgrade.id);
+  updateUpgrade(detail.upgrade.id);
   switch (detail.upgrade.type) {
     case UpgradeType.PASSIVE:
       updatePassiveIncomeDisplay();
@@ -211,16 +211,19 @@ function createUpgradeElement(upgrade: Upgrade): HTMLLIElement {
   }
 }
 
-function updateUpgradeCost(upgradeId: number) {
+function updateUpgrade(upgradeId: number) {
   let upgrade = upgradeData.find((u) => u.id === upgradeId);
   if (!upgrade) return;
   upgrade = gameState.upgrades.find((u) => u.id === upgradeId) ?? upgrade;
   const upgradeElements = upgradeList.querySelectorAll("li");
   upgradeElements.forEach((elem) => {
-    const costElem = elem.querySelector(".upgrade-cost");
-    if (costElem && elem.dataset.upgradeId === upgradeId.toString()) {
-      costElem.textContent = formatDollar(upgrade.getCost(), 1000, 3);
-    }
+    if (
+      !elem.dataset.upgradeId || elem.dataset.upgradeId !== upgradeId.toString()
+    ) return;
+    const costElem = elem.querySelector(".upgrade-cost")!;
+    costElem.textContent = formatDollar(upgrade.getCost(), 1000, 3);
+    const levelElem = elem.querySelector(".upgrade-level")!;
+    levelElem.textContent = `${(upgrade as PurchasedUpgrade).level ?? 0}`;
   });
 }
 
@@ -243,18 +246,9 @@ function updateUpgradeDisplay() {
     const upgradeButton = elem.querySelector(
       ".upgrade-button",
     ) as HTMLButtonElement;
-    const levelElem = elem.querySelector(".upgrade-level") as HTMLElement;
 
     if (purchasedUpgrade) {
       elem.classList.add("purchased");
-      if (levelElem) {
-        levelElem.textContent = `${purchasedUpgrade.level}`;
-      }
-    } else {
-      elem.classList.remove("purchased");
-      if (levelElem) {
-        levelElem.textContent = "";
-      }
     }
 
     upgradeButton.disabled =
@@ -281,7 +275,7 @@ function updateUpgradeTooltipContent(upgrade: PurchasedUpgrade) {
     )
   }`;
   const suffix = upgrade.type === UpgradeType.CLICK ? "c" : "s";
-  tooltipLevel.textContent = `Level: ${upgrade.level}`;
+  tooltipLevel.textContent = `Level: ${upgrade.level ?? 0}`;
   tooltipValue.textContent = `Value: +${
     formatDollar(upgrade.baseValue, 1000)
   }/${suffix}`;
