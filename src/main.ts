@@ -1,6 +1,11 @@
 import { drawClickEffects } from "./effects.ts";
 import "./style.css";
-import { Upgrade, upgradeData, UpgradeType } from "./upgrades.ts";
+import {
+  PurchasedUpgrade,
+  Upgrade,
+  upgradeData,
+  UpgradeType,
+} from "./upgrades.ts";
 
 declare global {
   var runGameLoop: boolean;
@@ -25,10 +30,6 @@ type GameState = {
   upgrades: Array<PurchasedUpgrade>;
   clickPower: number;
   lastPassiveIncome: number;
-};
-
-type PurchasedUpgrade = Upgrade & {
-  level: number;
 };
 
 interface UpgradePurchasedEventDetail {
@@ -124,12 +125,14 @@ document.addEventListener("upgrade-purchased", (e) => {
   }
 });
 
-function tickUpgrades(_delta: number) {
-  gameState.upgrades.forEach((upgrade) => {
-    if (upgrade.type === UpgradeType.PASSIVE) {
-      gameState.currency += upgrade.level * upgrade.baseValue * _delta;
-    }
-  });
+function tickUpgrades(delta: number) {
+  gameState.upgrades.filter((u) => u.type === UpgradeType.PASSIVE)
+    .forEach(
+      (upgrade) =>
+        gameState.currency += upgrade.getValue({
+          income: gameState.lastPassiveIncome,
+        }) * delta,
+    );
 }
 
 function purchaseUpgrade(upgradeId: number) {
@@ -137,15 +140,13 @@ function purchaseUpgrade(upgradeId: number) {
   if (!upgrade) return;
   const purchasedUpgrade = gameState.upgrades.find((u) => u.id === upgradeId) ??
     { ...upgrade, level: 0 };
-  const currentLevel = purchasedUpgrade.level;
-  const cost = calculateCost(currentLevel, upgrade.baseCost, upgrade.type);
-  if (gameState.currency < cost) return;
+  if (gameState.currency < purchasedUpgrade.getCost()) return;
 
   if (purchasedUpgrade.level === 0) {
     gameState.upgrades.push(purchasedUpgrade);
   }
 
-  gameState.currency -= cost;
+  gameState.currency -= purchasedUpgrade.getCost();
   purchasedUpgrade.level += 1;
 
   document.dispatchEvent(
@@ -166,11 +167,7 @@ function createUpgradeElement(upgrade: Upgrade): HTMLLIElement {
   listItem.dataset.upgradeId = upgrade.id.toString();
   nameElem.textContent = upgrade.name;
   costElem.textContent = formatDollar(
-    calculateCost(
-      getUpgradeLevel(upgrade.id),
-      upgrade.baseCost,
-      upgrade.type,
-    ),
+    upgrade.getCost(),
     1000,
   );
 
@@ -179,11 +176,14 @@ function createUpgradeElement(upgrade: Upgrade): HTMLLIElement {
 
   const tooltip = document.getElementById("upgrade-tooltip")!;
   let tooltipUpdateHandler: (() => void) | null = null;
+  const getUpgrade = () =>
+    gameState.upgrades.find((u) => u.id === upgrade.id) ??
+      upgrade as PurchasedUpgrade;
 
   upgradeButton.addEventListener("mouseover", () => {
-    updateUpgradeTooltipContent(upgrade);
+    updateUpgradeTooltipContent(getUpgrade());
     openTooltip();
-    tooltipUpdateHandler = () => updateUpgradeTooltipContent(upgrade);
+    tooltipUpdateHandler = () => updateUpgradeTooltipContent(getUpgrade());
     document.addEventListener("upgrade-purchased", tooltipUpdateHandler);
   });
 
@@ -212,17 +212,14 @@ function createUpgradeElement(upgrade: Upgrade): HTMLLIElement {
 }
 
 function updateUpgradeCost(upgradeId: number) {
-  const upgrade = upgradeData.find((u) => u.id === upgradeId);
+  let upgrade = upgradeData.find((u) => u.id === upgradeId);
   if (!upgrade) return;
-  const currentLevel =
-    gameState.upgrades.find((u) => u.id === upgradeId)?.level || 0;
-  const newCost = calculateCost(currentLevel, upgrade.baseCost, upgrade.type);
-
+  upgrade = gameState.upgrades.find((u) => u.id === upgradeId) ?? upgrade;
   const upgradeElements = upgradeList.querySelectorAll("li");
   upgradeElements.forEach((elem) => {
     const costElem = elem.querySelector(".upgrade-cost");
     if (costElem && elem.dataset.upgradeId === upgradeId.toString()) {
-      costElem.textContent = formatDollar(newCost, 1000, 3);
+      costElem.textContent = formatDollar(upgrade.getCost(), 1000, 3);
     }
   });
 }
@@ -260,13 +257,12 @@ function updateUpgradeDisplay() {
       }
     }
 
-    const level = purchasedUpgrade?.level || 0;
     upgradeButton.disabled =
-      gameState.currency < calculateCost(level, upgrade.baseCost, upgrade.type);
+      gameState.currency < (purchasedUpgrade?.getCost() ?? upgrade.getCost());
   });
 }
 
-function updateUpgradeTooltipContent(upgrade: Upgrade) {
+function updateUpgradeTooltipContent(upgrade: PurchasedUpgrade) {
   const tooltip = document.getElementById("upgrade-tooltip")!;
   const tooltipDescription = tooltip.querySelector(
     ".upgrade-tooltip-description",
@@ -280,16 +276,12 @@ function updateUpgradeTooltipContent(upgrade: Upgrade) {
   tooltipDescription.textContent = upgrade.description;
   tooltipCost.textContent = `Cost: ${
     formatDollar(
-      calculateCost(
-        getUpgradeLevel(upgrade.id),
-        upgrade.baseCost,
-        upgrade.type,
-      ),
+      upgrade.getCost(),
       1000,
     )
   }`;
   const suffix = upgrade.type === UpgradeType.CLICK ? "c" : "s";
-  tooltipLevel.textContent = `Level: ${getUpgradeLevel(upgrade.id)}`;
+  tooltipLevel.textContent = `Level: ${upgrade.level}`;
   tooltipValue.textContent = `Value: +${
     formatDollar(upgrade.baseValue, 1000)
   }/${suffix}`;
@@ -301,15 +293,7 @@ function updateUpgradeTooltipContent(upgrade: Upgrade) {
   }/${suffix}`;
 }
 
-function getUpgradeLevel(upgradeId: number): number {
-  const upgrade = gameState.upgrades.find((u) => u.id === upgradeId);
-  return upgrade ? upgrade.level : 0;
-}
 //#endregion
-
-function calculateCost(level: number, baseCost: number, type: string): number {
-  return (type === UpgradeType.CLICK ? 3 : 1.15) ** level * baseCost;
-}
 
 function calculateClickValue(): number {
   return gameState.clickPower;

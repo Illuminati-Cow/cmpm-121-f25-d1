@@ -10,25 +10,45 @@ export interface Upgrade {
   type: string;
   baseCost: number;
   baseValue: number;
-  getValue: (context: UpgradeValueContext) => number;
+  getValue(context: UpgradeValueContext): number;
+  getCost(): number;
 }
+
+export type PurchasedUpgrade = Upgrade & {
+  level: number;
+};
 
 export const UpgradeType = {
   PASSIVE: "passive",
   CLICK: "click",
 };
 
+const clickCostMultiplier = 3.0;
+const passiveCostMultiplier = 1.15;
+
 const flatUpgradeValue = function (
-  this: Upgrade,
+  this: PurchasedUpgrade,
 ): number {
-  return this.baseValue;
+  return this.baseValue * (this.level || 0);
 };
 
 const percentIncomeUpgradeValue = function (
-  this: Upgrade,
+  this: PurchasedUpgrade,
   context: UpgradeValueContext,
 ): number {
-  return (this.baseValue / 100) * context.income!;
+  return (this.baseValue * (this.level || 0) / 100) * context.income!;
+};
+
+const getClickUpgradeCost = function (
+  this: PurchasedUpgrade,
+): number {
+  return this.baseCost * Math.pow(clickCostMultiplier, this.level || 0);
+};
+
+const getPassiveUpgradeCost = function (
+  this: PurchasedUpgrade,
+): number {
+  return this.baseCost * Math.pow(passiveCostMultiplier, this.level || 0);
 };
 
 export const upgradeData: Upgrade[] = [
@@ -41,6 +61,7 @@ export const upgradeData: Upgrade[] = [
     baseCost: 100,
     baseValue: 1,
     getValue: flatUpgradeValue,
+    getCost: getClickUpgradeCost,
   },
   {
     id: 6,
@@ -51,6 +72,7 @@ export const upgradeData: Upgrade[] = [
     baseCost: 2000,
     baseValue: 10,
     getValue: percentIncomeUpgradeValue,
+    getCost: getClickUpgradeCost,
   },
   {
     id: 1,
@@ -60,6 +82,7 @@ export const upgradeData: Upgrade[] = [
     baseCost: 10,
     baseValue: 0.25,
     getValue: flatUpgradeValue,
+    getCost: getPassiveUpgradeCost,
   },
   {
     id: 2,
@@ -69,6 +92,7 @@ export const upgradeData: Upgrade[] = [
     baseCost: 100,
     baseValue: 3,
     getValue: flatUpgradeValue,
+    getCost: getPassiveUpgradeCost,
   },
   {
     id: 3,
@@ -78,6 +102,7 @@ export const upgradeData: Upgrade[] = [
     baseCost: 1500,
     baseValue: 30,
     getValue: flatUpgradeValue,
+    getCost: getPassiveUpgradeCost,
   },
   {
     id: 4,
@@ -87,6 +112,7 @@ export const upgradeData: Upgrade[] = [
     baseCost: 100000,
     baseValue: 500,
     getValue: flatUpgradeValue,
+    getCost: getPassiveUpgradeCost,
   },
   {
     id: 5,
@@ -96,5 +122,6 @@ export const upgradeData: Upgrade[] = [
     baseCost: 1000000,
     baseValue: 2500,
     getValue: flatUpgradeValue,
+    getCost: getPassiveUpgradeCost,
   },
 ];
