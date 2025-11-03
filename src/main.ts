@@ -38,6 +38,7 @@ interface UpgradePurchasedEventDetail {
 //#endregion
 
 const clickSound = new Audio("click.wav");
+const upgradeSound = new Audio("upgrade_thump.wav");
 clickSound.volume = 0.5;
 clickSound.load();
 document.body.appendChild(clickSound);
@@ -113,6 +114,8 @@ document.addEventListener("upgrade-purchased", (e) => {
   updateUpgrade(detail.upgrade);
   updatePassiveIncomeDisplay();
   clickPowerDisplay.textContent = formatDollar(calculateClickPower(), 1000);
+  upgradeSound.currentTime = 0;
+  upgradeSound.play();
 });
 
 function tickUpgrades(delta: number) {
