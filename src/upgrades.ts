@@ -1,6 +1,9 @@
+import { formatDollar } from "./utilities.ts";
+
 export interface UpgradeValueContext {
   income?: number;
   clickPower?: number;
+  levelOverride?: number;
 }
 
 export interface Upgrade {
@@ -12,6 +15,7 @@ export interface Upgrade {
   baseValue: number;
   getValue(context: UpgradeValueContext): number;
   getCost(): number;
+  getValueString(context: UpgradeValueContext): string;
 }
 
 export type PurchasedUpgrade = Upgrade & {
@@ -28,15 +32,17 @@ const passiveCostMultiplier = 1.15;
 
 const flatUpgradeValue = function (
   this: PurchasedUpgrade,
+  context: UpgradeValueContext,
 ): number {
-  return this.baseValue * (this.level || 0);
+  return this.baseValue * (context.levelOverride || this.level || 0);
 };
 
 const percentIncomeUpgradeValue = function (
   this: PurchasedUpgrade,
   context: UpgradeValueContext,
 ): number {
-  return (this.baseValue * (this.level || 0)) * context.income!;
+  return (this.baseValue * (context.levelOverride || this.level || 0)) *
+    context.income!;
 };
 
 const getClickUpgradeCost = function (
@@ -51,6 +57,30 @@ const getPassiveUpgradeCost = function (
   return this.baseCost * Math.pow(passiveCostMultiplier, this.level || 0);
 };
 
+const defaultValueString = function (
+  this: PurchasedUpgrade,
+  context: UpgradeValueContext,
+): string {
+  const value = this.getValue(context);
+  if (this.type === UpgradeType.CLICK) {
+    return `${formatDollar(value, 1000)}/click`;
+  } else if (this.type === UpgradeType.PASSIVE) {
+    return `${formatDollar(value, 1000)}/second`;
+  }
+  return `${formatDollar(value, 1000)}`;
+};
+
+const percentIncomeValueString = function (
+  this: PurchasedUpgrade,
+  context: UpgradeValueContext,
+): string {
+  const level = context.levelOverride || this.level || 0;
+  const value = this.getValue(context);
+  return `${(this.baseValue * level * 100).toFixed(2)}% of income (${
+    formatDollar(value, 1000)
+  }/second)`;
+};
+
 export const upgradeData: Upgrade[] = [
   {
     id: 0,
@@ -62,6 +92,7 @@ export const upgradeData: Upgrade[] = [
     baseValue: 1,
     getValue: flatUpgradeValue,
     getCost: getClickUpgradeCost,
+    getValueString: defaultValueString,
   },
   {
     id: 6,
@@ -73,6 +104,7 @@ export const upgradeData: Upgrade[] = [
     baseValue: 0.05,
     getValue: percentIncomeUpgradeValue,
     getCost: getClickUpgradeCost,
+    getValueString: percentIncomeValueString,
   },
   {
     id: 1,
@@ -83,6 +115,7 @@ export const upgradeData: Upgrade[] = [
     baseValue: 0.25,
     getValue: flatUpgradeValue,
     getCost: getPassiveUpgradeCost,
+    getValueString: defaultValueString,
   },
   {
     id: 2,
@@ -93,6 +126,7 @@ export const upgradeData: Upgrade[] = [
     baseValue: 3,
     getValue: flatUpgradeValue,
     getCost: getPassiveUpgradeCost,
+    getValueString: defaultValueString,
   },
   {
     id: 3,
@@ -103,6 +137,7 @@ export const upgradeData: Upgrade[] = [
     baseValue: 30,
     getValue: flatUpgradeValue,
     getCost: getPassiveUpgradeCost,
+    getValueString: defaultValueString,
   },
   {
     id: 4,
@@ -113,6 +148,7 @@ export const upgradeData: Upgrade[] = [
     baseValue: 500,
     getValue: flatUpgradeValue,
     getCost: getPassiveUpgradeCost,
+    getValueString: defaultValueString,
   },
   {
     id: 5,
@@ -123,5 +159,6 @@ export const upgradeData: Upgrade[] = [
     baseValue: 2500,
     getValue: flatUpgradeValue,
     getCost: getPassiveUpgradeCost,
+    getValueString: defaultValueString,
   },
 ];

@@ -6,6 +6,7 @@ import {
   upgradeData,
   UpgradeType,
 } from "./upgrades.ts";
+import { formatDollar } from "./utilities.ts";
 
 declare global {
   var runGameLoop: boolean;
@@ -246,20 +247,17 @@ function updateUpgradeTooltipContent(upgrade: PurchasedUpgrade) {
       1000,
     )
   }`;
-  const suffix = upgrade.type === UpgradeType.CLICK ? "c" : "s";
   tooltipLevel.textContent = `Level: ${upgrade.level ?? 0}`;
+  const context = {
+    income: calculatePassiveIncome(),
+    clickPower: calculateClickPower(),
+  };
   tooltipValue.textContent = `Value: +${
-    formatDollar(upgrade.baseValue, 1000)
-  }/${suffix}`;
-  tooltipTotalValue.textContent = `Total Value: +${
-    formatDollar(
-      upgrade.getValue({
-        income: calculatePassiveIncome(),
-        clickPower: calculateClickPower(),
-      }),
-      1000,
-    )
-  }/${suffix}`;
+    upgrade.getValueString({ ...context, levelOverride: 1 })
+  }`;
+  tooltipTotalValue.textContent = `Total: +${
+    upgrade.getValueString({ ...context, levelOverride: upgrade.level ?? 0 })
+  }`;
 }
 
 //#endregion
@@ -313,43 +311,6 @@ function updateCurrencyDisplay(renderDelta: number) {
   }
   currencyDisplay.title = `$${gameState.currency.toFixed(2)}`;
   currencyDisplay!.textContent = formatDollar(displayedCurrency, 10_000);
-}
-
-function formatDollar(
-  num: number,
-  threshold: number,
-  decimals: number = 2,
-): string {
-  const suffixes = [
-    "",
-    "k",
-    "M",
-    "B",
-    "T",
-    "Q",
-    "Qi",
-    "Sx",
-    "Sp",
-    "Oc",
-    "No",
-    "Dc",
-  ];
-  if (num < threshold) {
-    return `$${num.toFixed(2)}`;
-  }
-  let suffixIndex = 0;
-  const sign = Math.sign(num);
-  num = Math.abs(num);
-  while (num >= 1000 && suffixIndex < suffixes.length - 1) {
-    num /= 1000;
-    suffixIndex++;
-  }
-  return `$${sign < 0 ? "-" : ""}${
-    num.toFixed(Math.min(Math.max(suffixIndex, 2), decimals)).replace(
-      /\.0$/,
-      "",
-    )
-  }${suffixes[suffixIndex]}`;
 }
 
 //#region Game Loops
